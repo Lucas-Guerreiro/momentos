@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Momentos - Recorte de Vídeos Esportivos</title>
+    <meta name="description" content="Sistema de gravação instantânea e recorte de lances polêmicos e gols através de botões arcade e câmeras USB/IP.">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- Barra Lateral -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <!-- Ícone de gravação/câmera -->
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M23 7l-7 5 7 5V7zm-9 10H3c-1.1 0-2-.9-2-2V9c0-1.1.9-2 2-2h11c1.1 0 2 .9 2 2v6c0 1.1-.9 2-2 2z"/>
+                    </svg>
+                </div>
+                <div class="brand-name">MOMENTOS</div>
+            </div>
+
+            <nav class="nav-menu">
+                <ul class="nav-links">
+                    <li class="nav-item active" data-target="dashboard-view">
+                        <a href="#dashboard">
+                            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none">
+                                <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+                                <rect x="14" y="3" width="7" height="5" rx="1"></rect>
+                                <rect x="14" y="12" width="7" height="9" rx="1"></rect>
+                                <rect x="3" y="16" width="7" height="5" rx="1"></rect>
+                            </svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item" data-target="cameras-view">
+                        <a href="#cameras">
+                            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none">
+                                <path d="M23 7l-7 5 7 5V7z"></path>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                            </svg>
+                            Câmeras
+                        </a>
+                    </li>
+                    <li class="nav-item" data-target="controles-view">
+                        <a href="#controles">
+                            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <circle cx="12" cy="12" r="6"></circle>
+                                <circle cx="12" cy="12" r="2"></circle>
+                            </svg>
+                            Controles / Disparos
+                        </a>
+                    </li>
+                    <li class="nav-item" data-target="galeria-view">
+                        <a href="#galeria">
+                            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            Galeria de Clipes
+                        </a>
+                    </li>
+                    <li class="nav-item" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.5rem;">
+                        <a href="/atleta" target="_blank" style="color: #60a5fa; font-weight: 600;">
+                            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" style="color: #60a5fa;">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                            </svg>
+                            Portal do Atleta ↗
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <p>Momentos v1.0.0</p>
+                <p style="font-size: 0.7rem; margin-top: 5px; opacity: 0.6;">Rodando localmente</p>
+            </div>
+        </aside>
+
+        <!-- Conteúdo Principal -->
+        <main class="main-content">
+            
+            <!-- Dashboard View -->
+            <section id="dashboard-view" class="page-section active">
+                <div class="page-header">
+                    <div class="page-title">
+                        <h1>Dashboard</h1>
+                        <p>Acompanhamento ao vivo e disparos manuais</p>
+                    </div>
+                    <button class="btn btn-primary" id="btn-show-qr" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                        📱 QR Code para Atletas
+                    </button>
+                </div>
+
+                <div class="dashboard-grid" id="feeds-grid">
+                    <!-- Inserido dinamicamente via JS -->
+                    <div class="glass-card" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+                        <p class="text-muted">Nenhuma câmera configurada. Vá até a aba "Câmeras" para cadastrar.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Câmeras View -->
+            <section id="cameras-view" class="page-section">
+                <div class="page-header">
+                    <div class="page-title">
+                        <h1>Configurar Câmeras</h1>
+                        <p>Gerencie as conexões de vídeo USB ou streams IP RTSP</p>
+                    </div>
+                </div>
+
+                <div class="config-grid">
+                    <!-- Formulário de Nova Câmera -->
+                    <div class="glass-card">
+                        <div class="card-header">
+                            <h2 class="card-title">Adicionar Nova Câmera</h2>
+                        </div>
+                        <form id="add-camera-form">
+                            <div class="form-group">
+                                <label for="cam-name">Nome da Câmera</label>
+                                <input type="text" id="cam-name" class="form-control" placeholder="Ex: Câmera Gol Esquerdo" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="cam-source-select">Fonte do Vídeo (Câmeras Detectadas)</label>
+                                <select id="cam-source-select" class="form-control" required>
+                                    <option value="" disabled selected>Buscando câmeras conectadas...</option>
+                                    <option value="custom">-- Câmera IP / RTSP / Arquivo Customizado --</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="cam-source-manual-group" style="display: none;">
+                                <label for="cam-source-manual">Endereço IP/RTSP ou Caminho do Vídeo</label>
+                                <input type="text" id="cam-source-manual" class="form-control" placeholder="rtsp://192.168.1.100:554/stream ou backend/video_teste.mp4">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="cam-fps">FPS Sugerido</label>
+                                    <input type="number" id="cam-fps" class="form-control" value="30" min="1" max="120" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="cam-buffer">Buffer (Segundos)</label>
+                                    <input type="number" id="cam-buffer" class="form-control" value="30" min="2" max="60" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="margin-top: 1rem; width: 100%;">
+                                Salvar Câmera
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Lista de Câmeras Cadastradas -->
+                    <div class="glass-card">
+                        <div class="card-header">
+                            <h2 class="card-title">Câmeras Ativas</h2>
+                        </div>
+                        <div class="camera-list" id="camera-list-container">
+                            <!-- Inserido dinamicamente via JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Controles / Mapeamento View -->
+            <section id="controles-view" class="page-section">
+                <div class="page-header">
+                    <div class="page-title">
+                        <h1>Mapeamento de Disparos</h1>
+                        <p>Configure botões arcade USB ou teclas do teclado para acionar os recortes</p>
+                    </div>
+                </div>
+
+                <div class="config-grid">
+                    <!-- Configurações Globais de Tempo -->
+                    <div class="glass-card">
+                        <div class="card-header">
+                            <h2 class="card-title">Tempos de Recorte</h2>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="config-before">Segundos ANTES do clique</label>
+                                <input type="number" id="config-before" class="form-control" value="5" min="1" max="30">
+                            </div>
+                            <div class="form-group">
+                                <label for="config-after">Segundos DEPOIS do clique</label>
+                                <input type="number" id="config-after" class="form-control" value="3" min="1" max="30">
+                            </div>
+                        </div>
+                        <div class="form-row" style="margin-top: 1rem;">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="config-sound-select">Som de Confirmação do Disparo</label>
+                                <select id="config-sound-select" class="form-control">
+                                    <option value="arcade">Retro Arcade (Sweep Ascendente - 3s)</option>
+                                    <option value="chime">Chime Suave (Acorde de Sino - 3s)</option>
+                                    <option value="coin">Retro Coin (Estilo Mario - 0.5s)</option>
+                                    <option value="laser">Laser Curto (Estilo Nave - 0.4s)</option>
+                                    <option value="beep">Bip Clássico (Aviso Simples - 0.3s)</option>
+                                    <option value="silent">Sem Som (Mudo)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="btn-save-times" class="btn btn-primary" style="margin-top: 1rem; width: 100%;">
+                            Salvar Configurações
+                        </button>
+                        <p class="text-muted" style="font-size: 0.85rem; margin-top: 1rem; line-height: 1.4;">
+                            * Ao pressionar o botão arcade, o clipe gerado terá o tamanho total da soma desses dois valores. 
+                            Por exemplo: 5s antes + 3s depois = vídeo final de 8 segundos.
+                        </p>
+                    </div>
+
+                    <!-- Controles Arcade Detectados -->
+                    <div class="glass-card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--danger);">
+                                    <rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect>
+                                    <path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"></path>
+                                    <path d="M6 12l0 .01"></path>
+                                    <path d="M18 12l0 .01"></path>
+                                </svg>
+                                Arcade USB Detectados
+                            </h2>
+                        </div>
+                        <div id="gamepad-debugger-container" style="display: flex; flex-direction: column; gap: 1rem; min-height: 80px; justify-content: center;">
+                            <p class="text-muted" style="font-size: 0.9rem; text-align: center;">Nenhum controle detectado. Conecte seu Arcade USB e pressione qualquer botão.</p>
+                        </div>
+                    </div>
+
+
+                    <!-- Configuração dos Botões Arcade -->
+                    <div class="glass-card" style="grid-column: 1 / -1;">
+                        <div class="card-header">
+                            <h2 class="card-title">Associação Câmera x Botão Arcade</h2>
+                            <button id="btn-save-controls" class="btn btn-primary btn-secondary" style="padding: 0.5rem 1rem;">Salvar Mapeamentos</button>
+                        </div>
+                        
+                        <p class="text-muted" style="margin-bottom: 1rem;">
+                            Conecte o seu controle Arcade USB (Zero Delay, etc.) ou use o teclado do computador. 
+                            Clique em "Mapear" na câmera desejada e pressione a tecla ou botão físico do arcade.
+                        </p>
+
+                        <table class="mapping-table">
+                            <thead>
+                                <tr>
+                                    <th>Câmera</th>
+                                    <th>Tipo de Mapeamento</th>
+                                    <th>Tecla / Botão Associado</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mapping-table-body">
+                                <!-- Inserido dinamicamente via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Galeria de Clipes View -->
+            <section id="galeria-view" class="page-section">
+                <div class="page-header">
+                    <div class="page-title">
+                        <h1>Galeria de Recortes</h1>
+                        <p>Lances categorizados por data e horário de gravação</p>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <select id="gallery-date-filter" class="form-control" style="min-width: 200px; padding: 0.5rem 0.85rem;">
+                            <option value="all">📅 Todas as Datas</option>
+                        </select>
+                        <button class="btn btn-secondary" id="btn-refresh-gallery">
+                            Atualizar Galeria
+                        </button>
+                    </div>
+                </div>
+
+                <div id="clips-grid-container" style="display: flex; flex-direction: column; gap: 2rem;">
+                    <!-- Inserido dinamicamente via JS com agrupamento por datas -->
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Modal do Player de Vídeo -->
+    <div class="modal" id="player-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="player-video-title">Visualizar Lance</h3>
+                <button class="modal-close" id="btn-close-modal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="video-player-container">
+                    <video id="preview-video" preload="auto"></video>
+                </div>
+                
+                <!-- Controles Customizados de Reprodução -->
+                <div class="player-controls">
+                    <div class="controls-row">
+                        <input type="range" class="progress-slider" id="player-progress" min="0" max="100" value="0">
+                        <div class="time-display" id="player-time">00:00 / 00:00</div>
+                    </div>
+                    <div class="controls-row">
+                        <div class="controls-group">
+                            <!-- Botão Play/Pause -->
+                            <button class="btn btn-secondary" id="player-play" style="padding: 0.5rem 1rem;">
+                                Play
+                            </button>
+                            <!-- Frame a Frame Trás -->
+                            <button class="btn btn-secondary" id="player-prev-frame" style="padding: 0.5rem;" title="Frame Anterior">
+                                ◀
+                            </button>
+                            <!-- Frame a Frame Frente -->
+                            <button class="btn btn-secondary" id="player-next-frame" style="padding: 0.5rem;" title="Próximo Frame">
+                                ▶
+                            </button>
+                            <!-- Loop -->
+                            <button class="btn btn-secondary" id="player-loop" style="padding: 0.5rem 0.85rem;" title="Repetição Automática">
+                                Loop: OFF
+                            </button>
+                        </div>
+
+                        <!-- Velocidades de Reprodução -->
+                        <div class="controls-group">
+                            <span style="font-size: 0.85rem; color: var(--text-muted);">Velocidade:</span>
+                            <div class="speed-buttons">
+                                <button class="speed-btn" data-speed="0.25">0.25x</button>
+                                <button class="speed-btn" data-speed="0.5">0.5x</button>
+                                <button class="speed-btn" data-speed="0.75">0.75x</button>
+                                <button class="speed-btn active" data-speed="1.0">1x</button>
+                                <button class="speed-btn" data-speed="1.5">1.5x</button>
+                                <button class="speed-btn" data-speed="2.0">2x</button>
+                            </div>
+                        </div>
+
+                        <!-- Controle de Áudio -->
+                        <div class="controls-group">
+                            <span style="font-size: 0.85rem; color: var(--text-muted);">Volume:</span>
+                            <input type="range" class="volume-slider" id="player-volume" min="0" max="1" step="0.1" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 1rem; gap: 1rem;">
+                    <a id="btn-download-clip" class="btn btn-secondary" download>Fazer Download</a>
+                    <button class="btn btn-danger" id="btn-delete-clip">Excluir Clipe</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal do QR Code para Atletas -->
+    <div class="modal" id="qr-modal">
+        <div class="modal-content" style="max-width: 480px; text-align: center;">
+            <div class="modal-header">
+                <h3 class="modal-title">Acesso dos Atletas ao Vivo</h3>
+                <button class="modal-close" id="btn-close-qr-modal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 1.25rem; padding: 1.5rem;">
+                <p class="text-muted" style="font-size: 0.9rem;">
+                    Conecte o smartphone no <strong>mesmo Wi-Fi</strong> desta máquina e aponte a câmera para escanear o QR Code abaixo:
+                </p>
+                
+                <div id="qr-code-canvas-container" style="background: white; padding: 16px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: inline-block;">
+                    <!-- Canvas do QR Code inserido dinamicamente -->
+                </div>
+
+                <div style="width: 100%; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Link direto no navegador do celular:</span>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="input-athlete-url" readonly style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.05); color: #60a5fa; font-weight: 700; text-align: center;">
+                        <button class="btn btn-secondary" id="btn-copy-athlete-url" style="padding: 0.6rem 1rem;">Copiar</button>
+                    </div>
+                </div>
+
+                <a id="btn-open-athlete-portal" href="/atleta" target="_blank" class="btn btn-primary" style="width: 100%; text-decoration: none; display: inline-block; padding: 0.75rem;">
+                    Abrir Portal do Atleta nesta máquina ↗
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast de Notificação -->
+    <div class="notification-toast" id="toast">
+        Momento Gravado com Sucesso!
+    </div>
+
+    <!-- Javascripts do Frontend -->
+    <script src="js/qrcode.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

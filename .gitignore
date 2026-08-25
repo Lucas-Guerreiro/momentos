@@ -1,0 +1,36 @@
+# Ambientes Virtuais Python
+backend/venv/
+venv/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de vídeo e gravações pesadas
+backend/cortes/*.mp4
+backend/cortes/*.avi
+backend/cortes/*.mkv
+backend/cortes/.thumbs/
+backend/video_teste.mp4
+*.mp4
+
+# Binários e DLLs locais
+backend/*.dll
+backend/*.so
+backend/*.dylib
+
+# Arquivos de ambiente e segredos
+.env
+.env.local
+.env.*.local
+*.env
+
+# Arquivos de sistema e IDEs
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
