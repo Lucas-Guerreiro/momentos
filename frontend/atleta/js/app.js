@@ -1,6 +1,19 @@
 // Base da API sempre apontando para a origem da página atual
 const API_BASE = window.location.origin;
 
+// Credenciais do Supabase (Nuvem & Realtime)
+const SUPABASE_URL = "https://wdjyxbrlergrvfilulyv.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkanl4YnJsZXJncnZmaWx1bHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2OTA4MDIsImV4cCI6MjEwMzI2NjgwMn0.1bVKL8h4iaLz6J_tT3dg3N0zUJmSs5WP3SHwjDi9tqg";
+
+let supabaseClient = null;
+try {
+    if (window.supabase) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+} catch (e) {
+    console.warn("Supabase client não pôde ser iniciado:", e);
+}
+
 // Estado Global
 let allClips = [];
 let filteredClips = [];
@@ -56,40 +69,98 @@ document.addEventListener('DOMContentLoaded', () => {
     updateFavBadge();
     loadClips(true);
     setupEventListeners();
-    startPolling();
+    setupRealtimeSubscription();
 });
 
-// --- Carregar Clipes do Servidor ---
+// --- Carregar Clipes (Supabase com Fallback Local) ---
 async function loadClips(isInitial = false) {
+    let loadedFromCloud = false;
+
+    // 1. Tenta carregar do Supabase (Nuvem - funciona na Vercel e em qualquer lugar)
+    if (supabaseClient) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('lances')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (!error && data && data.length > 0) {
+                allClips = data.map(lance => {
+                    const ts = new Date(lance.created_at).getTime() / 1000;
+                    return {
+                        filename: lance.filename,
+                        video_url: lance.video_url || `${SUPABASE_URL}/storage/v1/object/public/videos/${lance.filename}`,
+                        thumb_url: lance.thumb_url || `${SUPABASE_URL}/storage/v1/object/public/videos/thumbs/${lance.filename}.jpg`,
+                        camera_name: lance.camera_name || extractCameraLabel(lance.filename),
+                        size_bytes: lance.size_bytes || 0,
+                        created_at: isNaN(ts) ? Date.now() / 1000 : ts
+                    };
+                });
+                loadedFromCloud = true;
+            }
+        } catch (err) {
+            console.warn("Aviso ao conectar ao Supabase:", err);
+        }
+    }
+
+    // 2. Fallback para API Local se estiver no computador da quadra
+    if (!loadedFromCloud) {
+        try {
+            const response = await fetch(`${API_BASE}/api/clips`);
+            if (response.ok) {
+                const data = await response.json();
+                allClips = data.map(clip => ({
+                    filename: clip.filename,
+                    video_url: `${API_BASE}/api/clips/${clip.filename}`,
+                    thumb_url: `${API_BASE}/api/clips/${clip.filename}/thumb`,
+                    camera_name: extractCameraLabel(clip.filename),
+                    size_bytes: clip.size_bytes,
+                    created_at: clip.created_at
+                }));
+            }
+        } catch (error) {
+            console.error("Erro ao carregar clipes locais:", error);
+        }
+    }
+
+    if (allClips.length > knownClipCount && !isInitial) {
+        newClipsBanner.style.display = 'block';
+    }
+    knownClipCount = allClips.length;
+
+    applyFiltersAndRender();
+}
+
+// --- Subscrição em Tempo Real (Supabase Realtime) ---
+function setupRealtimeSubscription() {
+    if (!supabaseClient) {
+        startPolling();
+        return;
+    }
+
     try {
-        const response = await fetch(`${API_BASE}/api/clips`);
-        if (!response.ok) throw new Error("Erro na resposta da API");
-        
-        const data = await response.json();
-        
-        // Se houver novos lances durante a partida
-        if (!isInitial && data.length > knownClipCount) {
-            newClipsBanner.style.display = 'block';
-        }
-        
-        knownClipCount = data.length;
-        allClips = data;
-        
-        applyFiltersAndRender();
-    } catch (error) {
-        console.error("Erro ao carregar clipes:", error);
-        if (isInitial) {
-            clipsContainer.innerHTML = `
-                <div class="empty-box">
-                    <p style="color: #f87171; font-weight: 700; margin-bottom: 0.5rem;">Falha ao conectar ao servidor.</p>
-                    <p style="font-size: 0.85rem;">Verifique se o servidor está ativo no computador.</p>
-                    <button class="btn-card-action btn-card-primary" style="margin: 1rem auto 0; max-width: 200px;" onclick="loadClips(true)">
-                        Tentar Novamente
-                    </button>
-                </div>
-            `;
-            feedCounter.textContent = '0 vídeos';
-        }
+        supabaseClient
+            .channel('realtime_lances_feed')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lances' }, (payload) => {
+                const lance = payload.new;
+                const ts = new Date(lance.created_at).getTime() / 1000;
+                const newClip = {
+                    filename: lance.filename,
+                    video_url: lance.video_url || `${SUPABASE_URL}/storage/v1/object/public/videos/${lance.filename}`,
+                    thumb_url: lance.thumb_url || `${SUPABASE_URL}/storage/v1/object/public/videos/thumbs/${lance.filename}.jpg`,
+                    camera_name: lance.camera_name || extractCameraLabel(lance.filename),
+                    size_bytes: lance.size_bytes || 0,
+                    created_at: isNaN(ts) ? Date.now() / 1000 : ts
+                };
+
+                allClips.unshift(newClip);
+                newClipsBanner.style.display = 'block';
+                showToast("🔥 Novo lance gravado na quadra!");
+            })
+            .subscribe();
+    } catch (e) {
+        console.warn("Falha ao iniciar Realtime, usando polling fallback:", e);
+        startPolling();
     }
 }
 
@@ -97,7 +168,7 @@ function startPolling() {
     if (pollingInterval) clearInterval(pollingInterval);
     pollingInterval = setInterval(() => {
         loadClips(false);
-    }, 4000);
+    }, 5000);
 }
 
 let selectedDateFilter = 'all';
@@ -225,8 +296,9 @@ function renderClipsGrid() {
             const formattedTime = new Date(clip.created_at * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const timeAgo = formatTimeAgo(clip.created_at);
             const sizeMb = (clip.size_bytes / (1024 * 1024)).toFixed(1);
-            const camLabel = extractCameraLabel(clip.filename);
-            const clipUrl = `${API_BASE}/api/clips/${clip.filename}`;
+            const camLabel = clip.camera_name || extractCameraLabel(clip.filename);
+            const clipUrl = clip.video_url || `${API_BASE}/api/clips/${clip.filename}`;
+            const thumbUrl = clip.thumb_url || `${API_BASE}/api/clips/${clip.filename}/thumb`;
 
             return `
                 <div class="video-card" data-filename="${clip.filename}">
@@ -239,7 +311,7 @@ function renderClipsGrid() {
                         </span>
                         <span class="card-time-badge">${timeAgo}</span>
                         
-                        <img class="card-thumb-img" src="${API_BASE}/api/clips/${clip.filename}/thumb" loading="lazy" alt="Lance">
+                        <img class="card-thumb-img" src="${thumbUrl}" loading="lazy" alt="Lance">
                         
                         <div class="card-overlay">
                             <div class="play-bubble">
@@ -405,17 +477,19 @@ function openPlayer(filename) {
     const dateFormatted = formatDateTime(clip.created_at);
     const sizeMb = (clip.size_bytes / (1024 * 1024)).toFixed(1);
 
-    playerTitle.textContent = extractCameraLabel(filename);
+    const clipUrl = clip.video_url || `${API_BASE}/api/clips/${filename}`;
+
+    playerTitle.textContent = clip.camera_name || extractCameraLabel(filename);
     playerMeta.textContent = `${dateFormatted} • ${sizeMb} MB`;
     
     // Configura botões
-    btnDownloadClip.href = `${API_BASE}/api/clips/${filename}`;
+    btnDownloadClip.href = clipUrl;
     btnDownloadClip.setAttribute('download', filename);
     btnFavToggle.classList.toggle('active', isFav);
     btnFavToggle.querySelector('.ico-star').setAttribute('fill', isFav ? 'currentColor' : 'none');
 
     // Carrega o vídeo
-    atletaVideo.src = `${API_BASE}/api/clips/${filename}`;
+    atletaVideo.src = clipUrl;
     atletaVideo.playbackRate = 1.0;
     atletaVideo.loop = true;
     btnLoopToggle.classList.add('active');
@@ -490,7 +564,8 @@ function toggleFavorite(filename, e) {
 async function shareClipDirectly(filename, e) {
     if (e) e.stopPropagation();
     
-    const videoUrl = `${API_BASE}/api/clips/${filename}`;
+    const targetClip = allClips.find(c => c.filename === filename) || activeClip;
+    const videoUrl = targetClip?.video_url || `${API_BASE}/api/clips/${filename}`;
     const shareTitle = `Lance - Momentos`;
     const shareText = `Confira esse lance gravado no Momentos:`;
 

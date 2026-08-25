@@ -370,6 +370,14 @@ class CameraCapture:
             else:
                 writer.release()
             logging.info(f"Gravação concluída para a câmera [{self.name}]: {output_path}")
+            
+            # Dispara upload em segundo plano para o Supabase Storage + Banco de dados
+            try:
+                import cloud_sync
+                cloud_sync.upload_clip_async(output_path, camera_name=self.name)
+            except Exception as e:
+                logging.warning(f"Aviso ao iniciar sincronização na nuvem: {e}")
+
             if callback:
                 try:
                     callback()

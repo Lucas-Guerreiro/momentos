@@ -897,19 +897,66 @@ function playBeepSound() {
     } catch(e) {
         console.warn("AudioContext não permitido ou não suportado", e);
     }
-}
+// Credenciais do Supabase (Nuvem & Realtime)
+const SUPABASE_URL = "https://wdjyxbrlergrvfilulyv.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkanl4YnJsZXJncnZmaWx1bHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2OTA4MDIsImV4cCI6MjEwMzI2NjgwMn0.1bVKL8h4iaLz6J_tT3dg3N0zUJmSs5WP3SHwjDi9tqg";
+
+let supabaseClient = null;
+try {
+    if (window.supabase) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+} catch(e) {}
 
 let selectedGalleryDate = 'all';
 
-// --- Galeria de Clipes Agrupada por Data ---
+// --- Galeria de Clipes Agrupada por Data (Supabase + Local) ---
 async function loadClips() {
-    try {
-        const response = await fetch(`${API_BASE}/api/clips`);
-        clips = await response.json();
-        renderClips();
-    } catch (error) {
-        console.error("Erro ao carregar clipes:", error);
+    let loadedFromCloud = false;
+    if (supabaseClient) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('lances')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (!error && data && data.length > 0) {
+                clips = data.map(lance => {
+                    const ts = new Date(lance.created_at).getTime() / 1000;
+                    return {
+                        filename: lance.filename,
+                        video_url: lance.video_url || `${SUPABASE_URL}/storage/v1/object/public/videos/${lance.filename}`,
+                        thumb_url: lance.thumb_url || `${SUPABASE_URL}/storage/v1/object/public/videos/thumbs/${lance.filename}.jpg`,
+                        size_bytes: lance.size_bytes || 0,
+                        created_at: isNaN(ts) ? Date.now() / 1000 : ts
+                    };
+                });
+                loadedFromCloud = true;
+            }
+        } catch(e) {
+            console.warn("Aviso ao conectar ao Supabase:", e);
+        }
     }
+
+    if (!loadedFromCloud) {
+        try {
+            const response = await fetch(`${API_BASE}/api/clips`);
+            if (response.ok) {
+                const data = await response.json();
+                clips = data.map(c => ({
+                    filename: c.filename,
+                    video_url: `${API_BASE}/api/clips/${c.filename}`,
+                    thumb_url: `${API_BASE}/api/clips/${c.filename}/thumb`,
+                    size_bytes: c.size_bytes,
+                    created_at: c.created_at
+                }));
+            }
+        } catch (error) {
+            console.error("Erro ao carregar clipes:", error);
+        }
+    }
+
+    renderClips();
 }
 
 function getDayKey(timestampSec) {
@@ -1013,6 +1060,9 @@ function renderClips() {
             const timeFormatted = new Date(clip.created_at * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const sizeMb = (clip.size_bytes / (1024 * 1024)).toFixed(2);
             
+            const targetClip = groupClips.find(c => c.filename === clip.filename) || clip;
+            const thumbUrl = targetClip.thumb_url || `${API_BASE}/api/clips/${clip.filename}/thumb`;
+
             return `
                 <div class="clip-card" onclick="openPlayer('${clip.filename}')">
                     <div class="clip-thumbnail">
@@ -1021,7 +1071,7 @@ function renderClips() {
                             <path d="M8 5v14l11-7z"></path>
                         </svg>
                         <!-- Miniatura ultra leve e rápida (10KB) -->
-                        <img class="clip-thumbnail-img" src="${API_BASE}/api/clips/${clip.filename}/thumb" loading="lazy" alt="${clip.filename}">
+                        <img class="clip-thumbnail-img" src="${thumbUrl}" loading="lazy" alt="${clip.filename}">
                     </div>
                     <div class="clip-info">
                         <div class="clip-name" title="${clip.filename}">${clip.filename}</div>
@@ -1061,8 +1111,11 @@ function openPlayer(filename) {
     activeClipFilename = filename;
     playerVideoTitle.textContent = `Lance: ${filename}`;
     
+    const targetClip = clips.find(c => c.filename === filename);
+    const videoUrl = targetClip?.video_url || `${API_BASE}/api/clips/${filename}`;
+
     // Configura o source do vídeo e recarrega
-    previewVideo.src = `${API_BASE}/api/clips/${filename}`;
+    previewVideo.src = videoUrl;
     previewVideo.load();
     previewVideo.playbackRate = 1.0;
     
