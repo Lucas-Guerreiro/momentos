@@ -87,10 +87,14 @@ async function loadClips(isInitial = false) {
             if (!error && data && data.length > 0) {
                 allClips = data.map(lance => {
                     const ts = new Date(lance.created_at).getTime() / 1000;
+                    const videoUrl = lance.video_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/${lance.filename}`;
+                    const previewUrl = lance.preview_url || videoUrl.replace('pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/', 'pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/previews/');
+
                     return {
                         filename: lance.filename,
-                        video_url: lance.video_url || `${SUPABASE_URL}/storage/v1/object/public/videos/${lance.filename}`,
-                        thumb_url: lance.thumb_url || `${SUPABASE_URL}/storage/v1/object/public/videos/thumbs/${lance.filename}.jpg`,
+                        video_url: videoUrl,
+                        preview_url: previewUrl,
+                        thumb_url: lance.thumb_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/thumbs/${lance.filename}.jpg`,
                         camera_name: lance.camera_name || extractCameraLabel(lance.filename),
                         size_bytes: lance.size_bytes || 0,
                         created_at: isNaN(ts) ? Date.now() / 1000 : ts
@@ -112,6 +116,7 @@ async function loadClips(isInitial = false) {
                 allClips = data.map(clip => ({
                     filename: clip.filename,
                     video_url: `${API_BASE}/api/clips/${clip.filename}`,
+                    preview_url: `${API_BASE}/api/clips/${clip.filename}`,
                     thumb_url: `${API_BASE}/api/clips/${clip.filename}/thumb`,
                     camera_name: extractCameraLabel(clip.filename),
                     size_bytes: clip.size_bytes,
@@ -144,10 +149,14 @@ function setupRealtimeSubscription() {
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lances' }, (payload) => {
                 const lance = payload.new;
                 const ts = new Date(lance.created_at).getTime() / 1000;
+                const videoUrl = lance.video_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/${lance.filename}`;
+                const previewUrl = lance.preview_url || videoUrl.replace('pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/', 'pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/previews/');
+
                 const newClip = {
                     filename: lance.filename,
-                    video_url: lance.video_url || `${SUPABASE_URL}/storage/v1/object/public/videos/${lance.filename}`,
-                    thumb_url: lance.thumb_url || `${SUPABASE_URL}/storage/v1/object/public/videos/thumbs/${lance.filename}.jpg`,
+                    video_url: videoUrl,
+                    preview_url: previewUrl,
+                    thumb_url: lance.thumb_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/thumbs/${lance.filename}.jpg`,
                     camera_name: lance.camera_name || extractCameraLabel(lance.filename),
                     size_bytes: lance.size_bytes || 0,
                     created_at: isNaN(ts) ? Date.now() / 1000 : ts
@@ -477,19 +486,20 @@ function openPlayer(filename) {
     const dateFormatted = formatDateTime(clip.created_at);
     const sizeMb = (clip.size_bytes / (1024 * 1024)).toFixed(1);
 
-    const clipUrl = clip.video_url || `${API_BASE}/api/clips/${filename}`;
+    const fullVideoUrl = clip.video_url || `${API_BASE}/api/clips/${filename}`;
+    const streamPreviewUrl = clip.preview_url || fullVideoUrl;
 
     playerTitle.textContent = clip.camera_name || extractCameraLabel(filename);
     playerMeta.textContent = `${dateFormatted} • ${sizeMb} MB`;
     
-    // Configura botões
-    btnDownloadClip.href = clipUrl;
+    // Configura botões de Ação (Download e Compartilhamento com Qualidade Máxima Original)
+    btnDownloadClip.href = fullVideoUrl;
     btnDownloadClip.setAttribute('download', filename);
     btnFavToggle.classList.toggle('active', isFav);
     btnFavToggle.querySelector('.ico-star').setAttribute('fill', isFav ? 'currentColor' : 'none');
 
-    // Carrega o vídeo
-    atletaVideo.src = clipUrl;
+    // Carrega o vídeo com a versão Preview Otimizada (Streaming Ultrarrápido e Fluido)
+    atletaVideo.src = streamPreviewUrl;
     atletaVideo.playbackRate = 1.0;
     atletaVideo.loop = true;
     btnLoopToggle.classList.add('active');

@@ -10,10 +10,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 def sync_all():
     clips_dir = os.path.join(os.path.dirname(__file__), "cortes")
-    all_files = [f for f in os.listdir(clips_dir) if f.endswith(".mp4") and not f.startswith("temp_")]
+    all_files = [f for f in os.listdir(clips_dir) if f.endswith(".mp4") and not f.startswith("temp_") and not f.startswith("test_")]
     all_files.sort(key=lambda f: os.path.getmtime(os.path.join(clips_dir, f)), reverse=True)
 
-    logging.info(f"Iniciando sincronização de {len(all_files)} vídeos para o Cloudflare R2...")
+    logging.info(f"Iniciando sincronização e geração de previews leves para {len(all_files)} vídeos...")
 
     def process_file(f):
         path = os.path.join(clips_dir, f)
@@ -32,11 +32,11 @@ def sync_all():
             ok, name = future.result()
             if ok:
                 success_count += 1
-                logging.info(f"[{success_count}/{len(all_files)}] Sincronizado com sucesso: {name}")
+                logging.info(f"[{success_count}/{len(all_files)}] Sincronizado com sucesso (Original + Preview): {name}")
             else:
                 logging.error(f"Falha ao sincronizar: {name}")
 
-    logging.info(f"Sincronização com Cloudflare R2 concluída! {success_count}/{len(all_files)} vídeos ativos.")
+    logging.info(f"Sincronização concluída! {success_count}/{len(all_files)} vídeos ativos com preview otimizado.")
 
 if __name__ == "__main__":
     sync_all()

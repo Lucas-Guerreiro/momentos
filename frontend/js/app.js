@@ -923,10 +923,14 @@ async function loadClips() {
             if (!error && data && data.length > 0) {
                 clips = data.map(lance => {
                     const ts = new Date(lance.created_at).getTime() / 1000;
+                    const videoUrl = lance.video_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/${lance.filename}`;
+                    const previewUrl = lance.preview_url || videoUrl.replace('pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/', 'pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/previews/');
+
                     return {
                         filename: lance.filename,
-                        video_url: lance.video_url || `${SUPABASE_URL}/storage/v1/object/public/videos/${lance.filename}`,
-                        thumb_url: lance.thumb_url || `${SUPABASE_URL}/storage/v1/object/public/videos/thumbs/${lance.filename}.jpg`,
+                        video_url: videoUrl,
+                        preview_url: previewUrl,
+                        thumb_url: lance.thumb_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/thumbs/${lance.filename}.jpg`,
                         size_bytes: lance.size_bytes || 0,
                         created_at: isNaN(ts) ? Date.now() / 1000 : ts
                     };
@@ -1112,7 +1116,7 @@ function openPlayer(filename) {
     playerVideoTitle.textContent = `Lance: ${filename}`;
     
     const targetClip = clips.find(c => c.filename === filename);
-    const videoUrl = targetClip?.video_url || `${API_BASE}/api/clips/${filename}`;
+    const videoUrl = targetClip?.preview_url || targetClip?.video_url || `${API_BASE}/api/clips/${filename}`;
 
     // Configura o source do vídeo e recarrega
     previewVideo.src = videoUrl;
