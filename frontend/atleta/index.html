@@ -3,222 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MOMENTOS • Portal do Atleta</title>
-    <meta name="description" content="Assista, analise em câmera lenta e compartilhe os lances gravados instantaneamente.">
-    <meta name="theme-color" content="#070a13">
-    <!-- Links Absolutos para garantir carregamento perfeito em /atleta e /atleta/ -->
+    <title>MOMENTOS • Feed do Atleta</title>
+    <meta name="description" content="Feed de lances e melhores momentos no estilo Instagram.">
+    <meta name="theme-color" content="#000000">
     <link rel="stylesheet" href="/atleta/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <div class="app-wrapper">
+    <div class="insta-app">
         
-        <!-- Header Superior Fixo -->
-        <header class="top-nav">
-            <div class="nav-brand">
-                <div class="logo-box">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                </div>
-                <div class="logo-text">
-                    <span class="logo-name">MOMENTOS</span>
-                    <span class="logo-badge">LANCES DA PARTIDA</span>
+        <!-- Header Estilo Instagram -->
+        <header class="insta-header">
+            <div class="header-left">
+                <div class="insta-logo">
+                    <span class="logo-title">MOMENTOS</span>
+                    <span class="live-dot" title="Transmissão Ativa"></span>
                 </div>
             </div>
 
-            <div class="nav-right">
-                <div class="status-pill">
-                    <span class="status-dot"></span>
-                    <span class="status-txt">AO VIVO</span>
-                </div>
-                <button id="btn-refresh" class="btn-icon" title="Recarregar lances">
+            <div class="header-right">
+                <button id="btn-open-search" class="header-icon-btn" title="Buscar">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
+                </button>
+                <button id="btn-header-favs" class="header-icon-btn" title="Salvos">
+                    <svg class="ico-heart-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                    <span class="fav-badge-count" id="fav-count">0</span>
                 </button>
             </div>
         </header>
 
-        <!-- Banner Flutuante de Novos Lances -->
-        <div id="new-clips-banner" class="floating-banner" style="display: none;">
-            <div class="banner-inner" id="btn-banner-load">
-                <span class="banner-pulse">🔥</span>
-                <span>Novos lances disponíveis! Toque para atualizar</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    <polyline points="18 15 12 9 6 15"></polyline>
+        <!-- Barra de Busca Expansível -->
+        <div class="search-drawer" id="search-drawer" style="display: none;">
+            <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
+                <input type="text" id="input-search" placeholder="Buscar por data, hora ou câmera..." autocomplete="off">
+                <button id="btn-clear-search" class="btn-clear-search">&times;</button>
             </div>
         </div>
 
-        <!-- Área Principal de Conteúdo -->
-        <main class="main-container">
-            
-            <!-- Barra de Busca & Filtros -->
-            <section class="filter-bar">
-                <div class="search-input-wrapper">
-                    <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <input type="text" id="input-search" placeholder="Filtrar por horário ou câmera..." autocomplete="off">
-                    <button id="btn-clear-search" class="btn-clear" style="display: none;">&times;</button>
-                </div>
+        <!-- Barra de Stories (Filtros de Datas e Câmeras com Borda Gradiente) -->
+        <section class="stories-section">
+            <div class="stories-wrapper" id="stories-container">
+                <!-- Inserido dinamicamente via JS -->
+            </div>
+        </section>
 
-                <!-- Chips / Pílulas de Câmeras e Favoritos -->
-                <div class="chips-scroll" id="filter-chips">
-                    <button class="filter-chip active" data-filter="all">Todos os Lances</button>
-                    <button class="filter-chip chip-fav" data-filter="favs">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                        </svg>
-                        Favoritos (<span id="fav-count">0</span>)
-                    </button>
-                </div>
-            </section>
+        <!-- Banner Flutuante de Novos Lances (Realtime) -->
+        <div id="new-clips-banner" class="floating-banner" style="display: none;">
+            <div class="banner-inner" id="btn-banner-load">
+                <span class="banner-pulse">🔥</span>
+                <span>Novos lances na quadra! Toque para ver</span>
+            </div>
+        </div>
 
-            <!-- Título da Seção & Contador -->
-            <div class="feed-header">
-                <h1 class="feed-title" id="feed-title">Todos os Lances</h1>
-                <span class="feed-badge" id="feed-counter">Carregando...</span>
+        <!-- Feed Principal (Estilo Feed do Instagram) -->
+        <main class="feed-main">
+            <div class="feed-filter-indicator" id="feed-filter-indicator" style="display: none;">
+                <span id="feed-filter-text">Filtrado por: Hoje</span>
+                <button id="btn-reset-filter">Ver Todos</button>
             </div>
 
-            <!-- Feed de Lances Agrupados por Data -->
-            <div id="clips-container" class="clips-feed-wrapper">
-                <div class="videos-grid">
-                    <!-- Skeleton Loading -->
-                    <div class="skeleton-card">
-                        <div class="skeleton-thumb"></div>
-                        <div class="skeleton-body">
-                            <div class="skeleton-line" style="width: 60%;"></div>
-                            <div class="skeleton-line" style="width: 40%;"></div>
+            <div id="clips-container" class="insta-feed-wrapper">
+                <!-- Skeleton Loading -->
+                <div class="insta-skeleton-card">
+                    <div class="sk-header">
+                        <div class="sk-avatar"></div>
+                        <div class="sk-lines">
+                            <div class="sk-line" style="width: 140px;"></div>
+                            <div class="sk-line" style="width: 80px;"></div>
                         </div>
                     </div>
-                    <div class="skeleton-card">
-                        <div class="skeleton-thumb"></div>
-                        <div class="skeleton-body">
-                            <div class="skeleton-line" style="width: 60%;"></div>
-                            <div class="skeleton-line" style="width: 40%;"></div>
-                        </div>
-                    </div>
+                    <div class="sk-media"></div>
                 </div>
             </div>
-
         </main>
 
-        <!-- Player Modal Especializado para Atletas -->
-        <div class="modal-overlay" id="player-modal">
-            <div class="modal-backdrop" id="player-backdrop"></div>
+        <!-- Barra de Navegação Inferior Fixa (Bottom Bar) -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" id="nav-tab-feed">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path>
+                </svg>
+                <span>Início</span>
+            </button>
+
+            <button class="nav-item" id="nav-tab-reels">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                </svg>
+                <span>Reels</span>
+            </button>
+
+            <button class="nav-item" id="nav-tab-favs">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>Salvos</span>
+            </button>
+
+            <button class="nav-item" id="nav-tab-refresh" title="Atualizar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+                <span>Atualizar</span>
+            </button>
+        </nav>
+
+        <!-- Player Modal em Modo "Reels" / Tela Cheia -->
+        <div class="reels-modal" id="player-modal">
+            <div class="reels-backdrop" id="player-backdrop"></div>
             
-            <div class="modal-sheet">
-                <!-- Cabeçalho do Player -->
-                <div class="modal-sheet-header">
-                    <div class="modal-title-group">
-                        <h2 class="modal-title" id="player-title">Visualizar Lance</h2>
-                        <span class="modal-meta" id="player-meta">--:-- • 0 MB</span>
-                    </div>
-                    <button class="btn-close-modal" id="btn-close-player">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
+            <div class="reels-stage">
+                <video id="atleta-video" playsinline preload="auto" loop></video>
+
+                <!-- Animação de Toque Duplo (Coração Gigante no Centro) -->
+                <div class="big-heart-anim" id="big-heart">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+                    </svg>
+                </div>
+
+                <!-- Botão Fechar no Topo -->
+                <button class="reels-close-btn" id="btn-close-player">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+
+                <!-- Barra Lateral Direita de Ações (Reels Style) -->
+                <div class="reels-actions-rail">
+                    <!-- Curtir / Favoritar -->
+                    <button class="rail-btn" id="btn-fav-toggle">
+                        <div class="rail-icon-box">
+                            <svg class="ico-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                            </svg>
+                        </div>
+                        <span class="rail-label" id="fav-label">Curtir</span>
                     </button>
-                </div>
 
-                <!-- Video Frame com Toque para Play/Pause -->
-                <div class="video-stage">
-                    <video id="atleta-video" playsinline preload="auto"></video>
-                    
-                    <div class="video-tap-area" id="video-touch-overlay">
-                        <div class="tap-icon" id="touch-indicator">
-                            <svg class="ico-play" viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
+                    <!-- VAR / Câmera Lenta -->
+                    <button class="rail-btn" id="btn-var-cycle">
+                        <div class="rail-icon-box var-box">
+                            <span class="speed-txt" id="var-speed-indicator">1.0x</span>
                         </div>
-                    </div>
-                </div>
+                        <span class="rail-label">VAR Lenta</span>
+                    </button>
 
-                <!-- Controles do Vídeo -->
-                <div class="modal-controls">
-                    
-                    <!-- Barra de Tempo / Progresso -->
-                    <div class="progress-container">
-                        <input type="range" id="video-progress" class="progress-bar" min="0" max="1000" value="0">
-                        <div class="time-readout">
-                            <span id="time-current">00:00.00</span>
-                            <span id="time-total">00:00.00</span>
-                        </div>
-                    </div>
-
-                    <!-- Botões de Controle do Lance (Play, Pulos, Frames) -->
-                    <div class="playback-buttons">
-                        <button class="btn-control" id="btn-skip-back" title="Voltar 3 segundos">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M1 4v6h6M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                            </svg>
-                            <span class="btn-subtext">-3s</span>
-                        </button>
-
-                        <button class="btn-control" id="btn-frame-prev" title="Frame anterior">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="19 20 9 12 19 4 19 20"></polygon>
-                                <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5"></line>
-                            </svg>
-                        </button>
-
-                        <!-- Botão Play/Pause Gigante -->
-                        <button class="btn-play-hero" id="btn-play-pause">
-                            <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="6 4 20 12 6 20 6 4"></polygon>
-                            </svg>
-                            <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
-                                <rect x="6" y="4" width="4" height="16" rx="1"></rect>
-                                <rect x="14" y="4" width="4" height="16" rx="1"></rect>
-                            </svg>
-                        </button>
-
-                        <button class="btn-control" id="btn-frame-next" title="Próximo frame">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="5 4 15 12 5 20 5 4"></polygon>
-                                <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"></line>
-                            </svg>
-                        </button>
-
-                        <button class="btn-control" id="btn-skip-forward" title="Avançar 3 segundos">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M23 4v6h-6M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                            </svg>
-                            <span class="btn-subtext">+3s</span>
-                        </button>
-                    </div>
-
-                    <!-- Seletor de Câmera Lenta / VAR -->
-                    <div class="var-bar">
-                        <span class="var-label">Câmera Lenta:</span>
-                        <div class="var-speeds">
-                            <button class="speed-btn" data-speed="0.25">0.25x</button>
-                            <button class="speed-btn" data-speed="0.5">0.5x</button>
-                            <button class="speed-btn" data-speed="0.75">0.75x</button>
-                            <button class="speed-btn active" data-speed="1.0">1x</button>
-                            <button class="speed-btn" data-speed="1.5">1.5x</button>
-                        </div>
-                        <button class="btn-loop active" id="btn-loop-toggle" title="Repetição em Loop">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="17 1 21 5 17 9"></polyline>
-                                <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
-                                <polyline points="7 23 3 19 7 15"></polyline>
-                                <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
-                            </svg>
-                            <span>Loop</span>
-                        </button>
-                    </div>
-
-                    <!-- Ações: WhatsApp / Compartilhar / Download -->
-                    <div class="action-buttons-group">
-                        <button class="btn-action btn-share-main" id="btn-share-clip">
+                    <!-- WhatsApp -->
+                    <button class="rail-btn rail-btn-whatsapp" id="btn-share-clip">
+                        <div class="rail-icon-box" style="background: rgba(37, 211, 102, 0.2); color: #25d366;">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                                 <circle cx="18" cy="5" r="3"></circle>
                                 <circle cx="6" cy="12" r="3"></circle>
@@ -226,25 +174,38 @@
                                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
                                 <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                             </svg>
-                            <span>WhatsApp</span>
-                        </button>
+                        </div>
+                        <span class="rail-label">WhatsApp</span>
+                    </button>
 
-                        <a id="btn-download-clip" class="btn-action btn-download-main" download>
+                    <!-- Baixar Original -->
+                    <a class="rail-btn" id="btn-download-clip" download>
+                        <div class="rail-icon-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                 <polyline points="7 10 12 15 17 10"></polyline>
                                 <line x1="12" y1="15" x2="12" y2="3"></line>
                             </svg>
-                            <span>Baixar</span>
-                        </a>
+                        </div>
+                        <span class="rail-label">Baixar</span>
+                    </a>
+                </div>
 
-                        <button class="btn-action btn-star-action" id="btn-fav-toggle" title="Favoritar">
-                            <svg class="ico-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                            </svg>
-                        </button>
+                <!-- Informações e Legenda no Rodapé do Reels -->
+                <div class="reels-bottom-info">
+                    <div class="reels-author-row">
+                        <div class="reels-avatar">⚽</div>
+                        <span class="reels-author-name" id="player-title">Arena Momentos</span>
+                        <span class="reels-badge-pill" id="player-cam-badge">Câmera Principal</span>
                     </div>
-
+                    <div class="reels-caption" id="player-meta">
+                        Lance gravado às 20:45 • Full HD
+                    </div>
+                    
+                    <!-- Barra de Progresso Fina no Rodapé -->
+                    <div class="reels-progress-wrap">
+                        <div class="reels-progress-fill" id="reels-progress-bar"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -256,7 +217,7 @@
 
     <!-- Supabase JS Client (Nuvem & Realtime) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Script com Caminho Absoluto -->
+    <!-- Script do Portal do Atleta -->
     <script src="/atleta/js/app.js"></script>
 </body>
 </html>
