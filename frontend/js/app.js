@@ -179,19 +179,26 @@ function setupQrModalListeners() {
 function initNavigation() {
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
-            e.preventDefault();
             const targetId = item.getAttribute('data-target');
+            if (!targetId) return; // Permite links externos como o Portal do Atleta
+            
+            e.preventDefault();
             
             navItems.forEach(nav => nav.classList.remove('active'));
             pageSections.forEach(sec => sec.classList.remove('active'));
             
             item.classList.add('active');
-            document.getElementById(targetId).classList.add('active');
+            const targetElem = document.getElementById(targetId);
+            if (targetElem) {
+                targetElem.classList.add('active');
+            }
 
             if (targetId === 'galeria-view') {
                 loadClips();
-            } else if (targetId === 'dashboard-view') {
+            } else if (targetId === 'dashboard-view' || targetId === 'cameras-view') {
                 loadCameras();
+            } else if (targetId === 'controles-view') {
+                loadBindings();
             }
         });
     });
@@ -897,6 +904,8 @@ function playBeepSound() {
     } catch(e) {
         console.warn("AudioContext não permitido ou não suportado", e);
     }
+}
+
 // Credenciais do Supabase (Nuvem & Realtime)
 const SUPABASE_URL = "https://wdjyxbrlergrvfilulyv.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkanl4YnJsZXJncnZmaWx1bHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2OTA4MDIsImV4cCI6MjEwMzI2NjgwMn0.1bVKL8h4iaLz6J_tT3dg3N0zUJmSs5WP3SHwjDi9tqg";
