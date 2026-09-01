@@ -20,6 +20,7 @@
 
     --radius-sm: 8px;
     --radius-md: 14px;
+    --radius-lg: 20px;
     --radius-full: 9999px;
 }
 
@@ -44,7 +45,7 @@ html, body {
     position: relative;
     width: 100%;
     height: 100dvh;
-    max-width: 500px; /* Tamanho mobile perfeito no desktop e celular */
+    max-width: 500px;
     margin: 0 auto;
     background: #000;
     overflow: hidden;
@@ -63,7 +64,7 @@ html, body {
     align-items: center;
     justify-content: space-between;
     padding: 0.85rem 1rem;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0) 100%);
     pointer-events: none;
 }
 
@@ -99,11 +100,11 @@ html, body {
     50% { transform: scale(1.3); opacity: 0.6; }
 }
 
-/* Abas no Topo (Todos / Hoje / Salvos) */
+/* Abas no Topo */
 .top-nav-tabs {
     display: flex;
     align-items: center;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--border-subtle);
@@ -125,20 +126,21 @@ html, body {
 }
 
 .top-tab.active {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.25);
     color: #fff;
 }
 
 .header-actions {
     display: flex;
     align-items: center;
+    gap: 8px;
 }
 
 .header-icon-btn {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(12px);
     border: 1px solid var(--border-subtle);
     color: #fff;
@@ -169,7 +171,7 @@ html, body {
 
 .stories-scroll {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     overflow-x: auto;
     padding: 0 1rem;
     scrollbar-width: none;
@@ -185,7 +187,7 @@ html, body {
     align-items: center;
     gap: 6px;
     padding: 4px 10px;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(10px);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-full);
@@ -205,7 +207,7 @@ html, body {
 }
 
 /* ==========================================================================
-   MODO 1: REELS VERTICAL CONTAINER (Arrastar para Cima / TikTok Snap)
+   MODO 1: REELS VERTICAL CONTAINER (Arrastar para Cima)
    ========================================================================== */
 .reels-scroll-container {
     width: 100%;
@@ -222,7 +224,7 @@ html, body {
     display: none;
 }
 
-/* Cada Slide de Lance no Feed */
+/* Slide de cada Lance */
 .reel-slide {
     position: relative;
     width: 100%;
@@ -236,15 +238,26 @@ html, body {
     overflow: hidden;
 }
 
-/* Fundo desfocado para preencher a tela */
+/* Fundo desfocado com miniatura */
 .reel-backdrop-blur {
     position: absolute;
     inset: -20px;
     background-size: cover;
     background-position: center;
-    filter: blur(25px) brightness(0.35);
+    filter: blur(25px) brightness(0.4);
     z-index: 1;
     transform: scale(1.1);
+}
+
+/* Imagem de Poster Visível */
+.reel-poster-fallback {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    z-index: 2;
+    background: transparent;
+    transition: opacity 0.3s ease;
 }
 
 /* Vídeo Principal */
@@ -253,7 +266,7 @@ html, body {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    z-index: 2;
+    z-index: 3;
     background: transparent;
 }
 
@@ -281,7 +294,7 @@ html, body {
     opacity: 1;
 }
 
-/* Indicador de Play/Pause no Toque Único */
+/* Indicador de Play/Pause */
 .reel-tap-indicator {
     position: absolute;
     top: 50%;
@@ -290,7 +303,7 @@ html, body {
     width: 68px;
     height: 68px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: #fff;
@@ -319,7 +332,7 @@ html, body {
 .reel-actions-rail {
     position: absolute;
     right: 12px;
-    bottom: 60px;
+    bottom: 65px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -385,7 +398,7 @@ html, body {
 }
 
 .var-speed-badge {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 900;
     color: #60a5fa;
 }
@@ -399,7 +412,7 @@ html, body {
     left: 0;
     right: 0;
     padding: 2.5rem 1rem 1rem;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -423,7 +436,12 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.9rem;
+    color: #60a5fa;
+}
+
+.reel-avatar-bubble svg {
+    width: 16px;
+    height: 16px;
 }
 
 .reel-author-name {
@@ -447,11 +465,21 @@ html, body {
     color: var(--text-secondary);
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
     max-width: 80%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .reel-caption-text strong {
     color: #fff;
     font-weight: 800;
+}
+
+.ico-lance-bullet {
+    width: 14px;
+    height: 14px;
+    color: #f59e0b;
+    flex-shrink: 0;
 }
 
 /* Barra de Progresso Fina no Rodapé */
@@ -469,6 +497,94 @@ html, body {
     height: 100%;
     background: #ffffff;
     transition: width 0.1s linear;
+}
+
+/* ==========================================================================
+   Bottom Sheet de Velocidades (0.25x até 2.0x)
+   ========================================================================== */
+.speed-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    z-index: 250;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.speed-sheet {
+    width: 100%;
+    max-width: 480px;
+    background: #18181b;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 1.25rem 1rem 2rem;
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.speed-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.speed-sheet-header h3 {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.speed-sheet-header button {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    cursor: pointer;
+}
+
+.speed-options-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.speed-opt {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.speed-opt.active {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: #3b82f6;
+    color: #60a5fa;
+}
+
+.speed-opt:active {
+    transform: scale(0.97);
+}
+
+.opt-sub {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 2px;
 }
 
 /* ==========================================================================

@@ -30,15 +30,27 @@
             </div>
 
             <div class="header-actions">
+                <!-- Botão de Áudio Global (Mutado / Com Som) -->
+                <button id="btn-global-audio" class="header-icon-btn" title="Ativar / Desativar Som">
+                    <svg class="icon-audio-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <line x1="23" y1="9" x2="17" y2="15"></line>
+                        <line x1="17" y1="9" x2="23" y2="15"></line>
+                    </svg>
+                    <svg class="icon-audio-on" style="display: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                </button>
+
+                <!-- Alternar Grade / Reels -->
                 <button id="btn-toggle-view" class="header-icon-btn" title="Alternar Grade / Reels">
-                    <!-- Ícone de Grade -->
                     <svg class="icon-grid-view" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                         <rect x="3" y="3" width="7" height="7" rx="1"></rect>
                         <rect x="14" y="3" width="7" height="7" rx="1"></rect>
                         <rect x="14" y="14" width="7" height="7" rx="1"></rect>
                         <rect x="3" y="14" width="7" height="7" rx="1"></rect>
                     </svg>
-                    <!-- Ícone de Reels -->
                     <svg class="icon-reels-view" style="display: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                         <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                         <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
@@ -71,6 +83,25 @@
         <!-- MODO 2: GRADE / EXPLORAR (Grade de Miniaturas) -->
         <div class="grid-explore-container" id="grid-explore" style="display: none;">
             <div class="grid-clips-wrap" id="grid-clips-container"></div>
+        </div>
+
+        <!-- Bottom Sheet Modal de Velocidades (0.25x até 2.0x) -->
+        <div class="speed-sheet-backdrop" id="speed-sheet-backdrop" style="display: none;">
+            <div class="speed-sheet">
+                <div class="speed-sheet-header">
+                    <h3>⚡ Velocidade do Lance (VAR)</h3>
+                    <button id="btn-close-speed-sheet">&times;</button>
+                </div>
+                <div class="speed-options-grid">
+                    <button class="speed-opt" data-speed="0.25">0.25x <span class="opt-sub">Super Lenta</span></button>
+                    <button class="speed-opt" data-speed="0.5">0.5x <span class="opt-sub">Câmera Lenta</span></button>
+                    <button class="speed-opt" data-speed="0.75">0.75x <span class="opt-sub">Quase Normal</span></button>
+                    <button class="speed-opt active" data-speed="1.0">1.0x <span class="opt-sub">Normal</span></button>
+                    <button class="speed-opt" data-speed="1.25">1.25x <span class="opt-sub">Rápido</span></button>
+                    <button class="speed-opt" data-speed="1.5">1.5x <span class="opt-sub">Muito Rápido</span></button>
+                    <button class="speed-opt" data-speed="2.0">2.0x <span class="opt-sub">Acelerado 2x</span></button>
+                </div>
+            </div>
         </div>
 
         <!-- Toast Flutuante -->

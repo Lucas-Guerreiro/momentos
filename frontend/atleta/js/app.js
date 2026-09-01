@@ -23,9 +23,13 @@ let allClips = [];
 let filteredClips = [];
 let currentFilter = 'all'; // 'all', 'today', 'favs', or date 'YYYY-MM-DD'
 let currentViewMode = 'reels'; // 'reels' or 'grid'
+let isMuted = true; // Começa mudo para permitir autoplay no mobile sem bloqueio
+let currentSpeed = 1.0;
+let activeSlideIndex = 0;
 let knownClipCount = 0;
 let pollingInterval = null;
 let currentActiveVideo = null;
+let currentActiveSlide = null;
 let intersectionObserver = null;
 
 // Favoritos locais no dispositivo do atleta
@@ -37,11 +41,19 @@ const gridExplore = document.getElementById('grid-explore');
 const gridClipsContainer = document.getElementById('grid-clips-container');
 const storiesContainer = document.getElementById('stories-container');
 const topFavCount = document.getElementById('top-fav-count');
+const btnGlobalAudio = document.getElementById('btn-global-audio');
+const iconAudioMuted = document.querySelector('.icon-audio-muted');
+const iconAudioOn = document.querySelector('.icon-audio-on');
 const btnToggleView = document.getElementById('btn-toggle-view');
 const iconGridView = document.querySelector('.icon-grid-view');
 const iconReelsView = document.querySelector('.icon-reels-view');
 const newClipsBanner = document.getElementById('new-clips-banner');
 const toastElement = document.getElementById('toast');
+
+// Modal Speed Sheet
+const speedSheetBackdrop = document.getElementById('speed-sheet-backdrop');
+const btnCloseSpeedSheet = document.getElementById('btn-close-speed-sheet');
+const speedOptButtons = document.querySelectorAll('.speed-opt');
 
 // Abas do Topo
 const tabAll = document.getElementById('tab-all');
@@ -246,14 +258,19 @@ function renderReelsFeed() {
 
         return `
             <div class="reel-slide" data-filename="${clip.filename}" data-index="${index}">
-                <!-- Fundo desfocado -->
+                <!-- Fundo desfocado com miniatura garantida -->
                 <div class="reel-backdrop-blur" style="background-image: url('${clip.thumb_url}');"></div>
+
+                <!-- Imagem de Poster sempre visível como fallback (sem tela preta) -->
+                <img class="reel-poster-fallback" src="${clip.thumb_url}" alt="Lance" loading="eager">
 
                 <!-- Vídeo em Stream Preview -->
                 <video class="reel-video" 
                        playsinline 
+                       webkit-playsinline
+                       muted
                        loop 
-                       preload="metadata" 
+                       preload="auto" 
                        poster="${clip.thumb_url}"
                        src="${clip.preview_url || clip.video_url}"></video>
 
@@ -284,13 +301,13 @@ function renderReelsFeed() {
                         <span class="rail-btn-label">${isFav ? 'Salvo' : 'Curtir'}</span>
                     </button>
 
-                    <!-- VAR / Câmera Lenta -->
+                    <!-- VAR / Menu de Velocidades (0.25x a 2.0x) -->
                     <button class="action-rail-btn btn-var" 
-                            onclick="cycleVarSpeedForSlide(this, event)">
+                            onclick="openSpeedSheetForSlide(this, event)">
                         <div class="rail-btn-icon">
                             <span class="var-speed-badge">1.0x</span>
                         </div>
-                        <span class="rail-btn-label">VAR Lenta</span>
+                        <span class="rail-btn-label">Velocidade</span>
                     </button>
 
                     <!-- WhatsApp -->
@@ -327,13 +344,20 @@ function renderReelsFeed() {
                 <!-- Overlay de Informações e Legenda no Rodapé -->
                 <div class="reel-bottom-overlay">
                     <div class="reel-author-row">
-                        <div class="reel-avatar-bubble">⚽</div>
+                        <div class="reel-avatar-bubble">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <circle cx="12" cy="12" r="10"></circle>
+                            </svg>
+                        </div>
                         <span class="reel-author-name">Arena Momentos</span>
                         <span class="reel-camera-tag">${camLabel}</span>
                     </div>
 
                     <div class="reel-caption-text">
-                        <strong>Lance às ${formattedTime}</strong> • ${timeAgo} • ${sizeMb} MB (Full HD)
+                        <svg class="ico-lance-bullet" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <strong>Lance às ${formattedTime}</strong> • ${timeAgo} • ${sizeMb} MB
                     </div>
 
                     <div class="reel-progress-track">
@@ -363,12 +387,28 @@ function setupReelsObserver() {
         entries.forEach(entry => {
             const slide = entry.target;
             const video = slide.querySelector('video');
+            const poster = slide.querySelector('.reel-poster-fallback');
             const progressFill = slide.querySelector('.reel-progress-fill');
 
             if (entry.isIntersecting) {
                 currentActiveVideo = video;
+                currentActiveSlide = slide;
+                activeSlideIndex = parseInt(slide.getAttribute('data-index') || '0');
+
+                video.muted = isMuted;
+                video.playbackRate = currentSpeed;
                 video.currentTime = 0;
-                video.play().catch(() => {});
+                
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        if (poster) poster.style.opacity = '0';
+                    }).catch(() => {
+                        // Se o navegador bloquear áudio, garante mudo e toca
+                        video.muted = true;
+                        video.play().catch(() => {});
+                    });
+                }
 
                 // Vincula atualização de tempo na barra de progresso do slide ativo
                 video.ontimeupdate = () => {
@@ -381,6 +421,7 @@ function setupReelsObserver() {
                 video.pause();
                 video.currentTime = 0;
                 video.ontimeupdate = null;
+                if (poster) poster.style.opacity = '1';
                 if (progressFill) progressFill.style.width = '0%';
             }
         });
@@ -402,7 +443,6 @@ function setupSlideGestures() {
         const likeBtn = slide.querySelector('.btn-like');
 
         slide.addEventListener('click', (e) => {
-            // Ignora cliques que vieram dos botões da barra lateral
             if (e.target.closest('.reel-actions-rail') || e.target.closest('.reel-author-row')) {
                 return;
             }
@@ -411,7 +451,7 @@ function setupSlideGestures() {
             const tapLength = currentTime - lastTap;
 
             if (tapLength < 300 && tapLength > 0) {
-                // Double-Tap: Curtir lance com explosão do coração! ❤️
+                // Double-Tap: Curtir lance com coração gigante! ❤️
                 if (!favorites.includes(filename)) {
                     toggleFavorite(filename, likeBtn);
                 }
@@ -432,27 +472,47 @@ function setupSlideGestures() {
     });
 }
 
-// --- Ciclo de Velocidades do VAR para cada Slide ($1.0\times \to 0.5\times \to 0.25\times$) ---
-function cycleVarSpeedForSlide(btn, e) {
+// --- Menu / Bottom Sheet de Velocidades (0.25x a 2.0x) ---
+function openSpeedSheetForSlide(btn, e) {
     if (e) e.stopPropagation();
-    const slide = btn.closest('.reel-slide');
-    const video = slide.querySelector('video');
-    const badge = btn.querySelector('.var-speed-badge');
+    speedSheetBackdrop.style.display = 'flex';
+    
+    // Atualiza botões ativos na sheet
+    speedOptButtons.forEach(opt => {
+        const sp = parseFloat(opt.getAttribute('data-speed'));
+        opt.classList.toggle('active', sp === currentSpeed);
+    });
+}
 
-    let currentRate = video.playbackRate;
-    if (currentRate === 1.0) {
-        video.playbackRate = 0.5;
-        badge.textContent = "0.5x";
-        showToast("⚡ Câmera Lenta: 0.5x");
-    } else if (currentRate === 0.5) {
-        video.playbackRate = 0.25;
-        badge.textContent = "0.25x";
-        showToast("⚡ Câmera Super Lenta (VAR): 0.25x");
-    } else {
-        video.playbackRate = 1.0;
-        badge.textContent = "1.0x";
-        showToast("▶️ Velocidade Normal: 1.0x");
+function selectSpeed(speed) {
+    currentSpeed = speed;
+    if (currentActiveVideo) {
+        currentActiveVideo.playbackRate = speed;
     }
+
+    // Atualiza badges em todos os slides
+    document.querySelectorAll('.var-speed-badge').forEach(b => {
+        b.textContent = `${speed}x`;
+    });
+
+    speedSheetBackdrop.style.display = 'none';
+    showToast(`⚡ Velocidade do lance ajustada: ${speed}x`);
+}
+
+// --- Alternador Global de Áudio (Mutado / Com Som) ---
+function toggleGlobalAudio() {
+    isMuted = !isMuted;
+    if (currentActiveVideo) {
+        currentActiveVideo.muted = isMuted;
+        if (!isMuted && currentActiveVideo.paused) {
+            currentActiveVideo.play().catch(() => {});
+        }
+    }
+
+    iconAudioMuted.style.display = isMuted ? 'block' : 'none';
+    iconAudioOn.style.display = isMuted ? 'none' : 'block';
+
+    showToast(isMuted ? "🔇 Vídeo no mudo" : "🔊 Som ativado!");
 }
 
 // --- MODO 2: RENDERIZAÇÃO DA GRADE DE EXPLORAR ---
@@ -511,7 +571,6 @@ function toggleFavorite(filename, btnElement, e) {
     localStorage.setItem('atleta_favs', JSON.stringify(favorites));
     updateFavBadge();
 
-    // Se estiver na aba Salvos e descurtir, atualiza o feed
     if (currentFilter === 'favs') {
         applyFiltersAndRender();
     }
@@ -598,7 +657,26 @@ function setupEventListeners() {
     tabToday.addEventListener('click', () => setFilter('today'));
     tabFavs.addEventListener('click', () => setFilter('favs'));
 
+    btnGlobalAudio.addEventListener('click', toggleGlobalAudio);
     btnToggleView.addEventListener('click', () => toggleViewMode());
+
+    // Botões de Velocidade
+    speedOptButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sp = parseFloat(btn.getAttribute('data-speed'));
+            selectSpeed(sp);
+        });
+    });
+
+    btnCloseSpeedSheet.addEventListener('click', () => {
+        speedSheetBackdrop.style.display = 'none';
+    });
+
+    speedSheetBackdrop.addEventListener('click', (e) => {
+        if (e.target === speedSheetBackdrop) {
+            speedSheetBackdrop.style.display = 'none';
+        }
+    });
 
     // Banner de novos lances em tempo real
     newClipsBanner.addEventListener('click', () => {
