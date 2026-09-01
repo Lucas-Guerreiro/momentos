@@ -68,7 +68,9 @@
 
         <!-- Banner Flutuante de Novos Lances (Realtime) -->
         <div id="new-clips-banner" class="floating-realtime-pill" style="display: none;">
-            <span class="pulse-fire">🔥</span>
+            <svg class="ico-fire-pulse" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 23c-4.97 0-9-4.03-9-9 0-3.93 2.53-7.27 6.07-8.49.52-.18 1.05.21 1.05.76v.36c0 .35.21.67.54.8 1.13.45 2.01 1.39 2.41 2.55.22.65 1.07.82 1.52.31.81-.92 1.41-2.02 1.41-3.28 0-.47.45-.82.91-.71C19.78 7.37 21 10.53 21 14c0 4.97-4.03 9-9 9z"/>
+            </svg>
             <span>Novo lance na quadra! Toque para ver</span>
         </div>
 
@@ -82,6 +84,9 @@
 
         <!-- MODO 2: GRADE / EXPLORAR (Grade de Miniaturas) -->
         <div class="grid-explore-container" id="grid-explore" style="display: none;">
+            <div class="grid-header-meta">
+                <span id="grid-count-label">Todos os Lances</span>
+            </div>
             <div class="grid-clips-wrap" id="grid-clips-container"></div>
         </div>
 

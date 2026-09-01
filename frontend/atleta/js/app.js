@@ -39,6 +39,7 @@ let favorites = JSON.parse(localStorage.getItem('atleta_favs') || '[]');
 const reelsFeed = document.getElementById('reels-feed');
 const gridExplore = document.getElementById('grid-explore');
 const gridClipsContainer = document.getElementById('grid-clips-container');
+const gridCountLabel = document.getElementById('grid-count-label');
 const storiesContainer = document.getElementById('stories-container');
 const topFavCount = document.getElementById('top-fav-count');
 const btnGlobalAudio = document.getElementById('btn-global-audio');
@@ -161,7 +162,7 @@ function setupRealtimeSubscription() {
 
                 allClips.unshift(newClip);
                 newClipsBanner.style.display = 'flex';
-                showToast("🔥 Novo lance gravado na quadra!");
+                showToast("Novo lance gravado na quadra!");
                 renderStoriesBar();
             })
             .subscribe();
@@ -178,7 +179,7 @@ function startPolling() {
     }, 6000);
 }
 
-// --- Barra de Stories (Pílulas de Datas) ---
+// --- Barra de Stories (Pílulas de Datas com Ícones SVG) ---
 function renderStoriesBar() {
     const datesMap = {};
     allClips.forEach(clip => {
@@ -191,17 +192,35 @@ function renderStoriesBar() {
 
     let storiesHtml = `
         <button class="story-pill ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">
-            <span>⚽ Todos</span>
+            <svg class="story-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polygon points="12 6 16 9 15 14 9 14 8 9"></polygon>
+            </svg>
+            <span>Todos</span>
         </button>
     `;
 
     dateKeys.forEach(dKey => {
         const isToday = dKey === todayKey;
         const [yyyy, mm, dd] = dKey.split('-');
-        const label = isToday ? '🔥 Hoje' : `📅 ${dd}/${mm}`;
+        const label = isToday ? 'Hoje' : `${dd}/${mm}`;
+
+        const iconSvg = isToday ? `
+            <svg class="story-ico" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 23c-4.97 0-9-4.03-9-9 0-3.93 2.53-7.27 6.07-8.49.52-.18 1.05.21 1.05.76v.36c0 .35.21.67.54.8 1.13.45 2.01 1.39 2.41 2.55.22.65 1.07.82 1.52.31.81-.92 1.41-2.02 1.41-3.28 0-.47.45-.82.91-.71C19.78 7.37 21 10.53 21 14c0 4.97-4.03 9-9 9z"/>
+            </svg>
+        ` : `
+            <svg class="story-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+        `;
 
         storiesHtml += `
             <button class="story-pill ${currentFilter === dKey ? 'active' : ''}" onclick="setFilter('${dKey}')">
+                ${iconSvg}
                 <span>${label} (${datesMap[dKey]})</span>
             </button>
         `;
@@ -241,7 +260,10 @@ function renderReelsFeed() {
     if (filteredClips.length === 0) {
         reelsFeed.innerHTML = `
             <div class="reels-loading-placeholder">
-                <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚽</div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 8px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polygon points="12 6 16 9 15 14 9 14 8 9"></polygon>
+                </svg>
                 <p style="font-weight: 800; font-size: 1.1rem; color: #fff;">Nenhum lance encontrado</p>
                 <p style="font-size: 0.8rem; color: var(--text-muted);">Aperte o botão arcade na quadra para gravar um momento!</p>
             </div>
@@ -451,7 +473,7 @@ function setupSlideGestures() {
             const tapLength = currentTime - lastTap;
 
             if (tapLength < 300 && tapLength > 0) {
-                // Double-Tap: Curtir lance com coração gigante! ❤️
+                // Double-Tap: Curtir lance com coração gigante!
                 if (!favorites.includes(filename)) {
                     toggleFavorite(filename, likeBtn);
                 }
@@ -496,7 +518,7 @@ function selectSpeed(speed) {
     });
 
     speedSheetBackdrop.style.display = 'none';
-    showToast(`⚡ Velocidade do lance ajustada: ${speed}x`);
+    showToast(`Velocidade do lance: ${speed}x`);
 }
 
 // --- Alternador Global de Áudio (Mutado / Com Som) ---
@@ -512,11 +534,15 @@ function toggleGlobalAudio() {
     iconAudioMuted.style.display = isMuted ? 'block' : 'none';
     iconAudioOn.style.display = isMuted ? 'none' : 'block';
 
-    showToast(isMuted ? "🔇 Vídeo no mudo" : "🔊 Som ativado!");
+    showToast(isMuted ? "Vídeo no mudo" : "Som ativado!");
 }
 
-// --- MODO 2: RENDERIZAÇÃO DA GRADE DE EXPLORAR ---
+// --- MODO 2: RENDERIZAÇÃO DA GRADE DE EXPLORAR (Miniaturas Imediatas) ---
 function renderGridView() {
+    if (gridCountLabel) {
+        gridCountLabel.textContent = `Exibindo ${filteredClips.length} lances gravados`;
+    }
+
     if (filteredClips.length === 0) {
         gridClipsContainer.innerHTML = `
             <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
@@ -530,8 +556,19 @@ function renderGridView() {
         const formattedTime = new Date(clip.created_at * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         return `
             <div class="grid-thumb-card" onclick="jumpToReel(${index})">
-                <img class="grid-thumb-img" src="${clip.thumb_url}" loading="lazy" alt="Lance">
-                <span class="grid-thumb-badge">${formattedTime}</span>
+                <img class="grid-thumb-img" 
+                     src="${clip.thumb_url}" 
+                     loading="eager" 
+                     alt="Lance"
+                     onerror="this.style.opacity='0.5'">
+                <div class="grid-card-overlay">
+                    <div class="grid-card-top">
+                        <svg class="grid-play-icon" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                    </div>
+                    <span class="grid-thumb-badge">${formattedTime}</span>
+                </div>
             </div>
         `;
     }).join('');
@@ -560,7 +597,7 @@ function toggleFavorite(filename, btnElement, e) {
         }
     } else {
         favorites.push(filename);
-        showToast("Salvo nos seus lances favoritos ❤️");
+        showToast("Salvo nos seus lances favoritos");
         if (btnElement) {
             btnElement.classList.add('active');
             btnElement.querySelector('.rail-btn-label').textContent = 'Salvo';
@@ -610,6 +647,7 @@ function toggleViewMode(forcedMode) {
         reelsFeed.style.display = 'none';
         gridExplore.style.display = 'block';
         iconGridView.style.display = 'none';
+        iconReelsView.style.display = 'none'; // Mostra ícone de voltar para Reels
         iconReelsView.style.display = 'block';
         if (currentActiveVideo) currentActiveVideo.pause();
         renderGridView();
