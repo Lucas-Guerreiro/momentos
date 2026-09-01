@@ -1,5 +1,5 @@
 // ==========================================================================
-// MOMENTOS • Portal do Atleta (Engine Estilo Instagram & Reels)
+// MOMENTOS • Engine do Portal do Atleta (Instagram Reels & TikTok Swipe)
 // ==========================================================================
 
 const API_BASE = window.location.origin;
@@ -18,59 +18,35 @@ try {
     console.warn("Supabase client notice:", e);
 }
 
-// Estado da Aplicação
+// Estado Global da Aplicação
 let allClips = [];
 let filteredClips = [];
-let currentFilter = 'all'; // 'all', 'favs', or date string 'YYYY-MM-DD', or camera
-let activeNavTab = 'feed'; // 'feed', 'reels', 'favs'
-let searchQuery = '';
-let activeClip = null;
-let currentVarSpeed = 1.0;
+let currentFilter = 'all'; // 'all', 'today', 'favs', or date 'YYYY-MM-DD'
+let currentViewMode = 'reels'; // 'reels' or 'grid'
 let knownClipCount = 0;
 let pollingInterval = null;
-let lastTapTime = 0;
+let currentActiveVideo = null;
+let intersectionObserver = null;
 
-// Favoritos locais (LocalStorage)
+// Favoritos locais no dispositivo do atleta
 let favorites = JSON.parse(localStorage.getItem('atleta_favs') || '[]');
 
-// Elementos do DOM
-const clipsContainer = document.getElementById('clips-container');
+// Elementos DOM
+const reelsFeed = document.getElementById('reels-feed');
+const gridExplore = document.getElementById('grid-explore');
+const gridClipsContainer = document.getElementById('grid-clips-container');
 const storiesContainer = document.getElementById('stories-container');
-const favCountBadge = document.getElementById('fav-count');
-const searchDrawer = document.getElementById('search-drawer');
-const inputSearch = document.getElementById('input-search');
-const btnOpenSearch = document.getElementById('btn-open-search');
-const btnClearSearch = document.getElementById('btn-clear-search');
-const btnHeaderFavs = document.getElementById('btn-header-favs');
-const feedFilterIndicator = document.getElementById('feed-filter-indicator');
-const feedFilterText = document.getElementById('feed-filter-text');
-const btnResetFilter = document.getElementById('btn-reset-filter');
+const topFavCount = document.getElementById('top-fav-count');
+const btnToggleView = document.getElementById('btn-toggle-view');
+const iconGridView = document.querySelector('.icon-grid-view');
+const iconReelsView = document.querySelector('.icon-reels-view');
 const newClipsBanner = document.getElementById('new-clips-banner');
-const btnBannerLoad = document.getElementById('btn-banner-load');
 const toastElement = document.getElementById('toast');
 
-// Elementos do Reels Modal
-const playerModal = document.getElementById('player-modal');
-const playerBackdrop = document.getElementById('player-backdrop');
-const btnClosePlayer = document.getElementById('btn-close-player');
-const atletaVideo = document.getElementById('atleta-video');
-const playerTitle = document.getElementById('player-title');
-const playerCamBadge = document.getElementById('player-cam-badge');
-const playerMeta = document.getElementById('player-meta');
-const reelsProgressBar = document.getElementById('reels-progress-bar');
-const bigHeart = document.getElementById('big-heart');
-const btnFavToggle = document.getElementById('btn-fav-toggle');
-const favLabel = document.getElementById('fav-label');
-const btnVarCycle = document.getElementById('btn-var-cycle');
-const varSpeedIndicator = document.getElementById('var-speed-indicator');
-const btnShareClip = document.getElementById('btn-share-clip');
-const btnDownloadClip = document.getElementById('btn-download-clip');
-
-// Bottom Nav
-const navTabFeed = document.getElementById('nav-tab-feed');
-const navTabReels = document.getElementById('nav-tab-reels');
-const navTabFavs = document.getElementById('nav-tab-favs');
-const navTabRefresh = document.getElementById('nav-tab-refresh');
+// Abas do Topo
+const tabAll = document.getElementById('tab-all');
+const tabToday = document.getElementById('tab-today');
+const tabFavs = document.getElementById('tab-favs');
 
 // --- Inicialização ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -136,7 +112,7 @@ async function loadClips(isInitial = false) {
     }
 
     if (allClips.length > knownClipCount && !isInitial) {
-        newClipsBanner.style.display = 'block';
+        newClipsBanner.style.display = 'flex';
     }
     knownClipCount = allClips.length;
 
@@ -153,7 +129,7 @@ function setupRealtimeSubscription() {
 
     try {
         supabaseClient
-            .channel('realtime_insta_feed')
+            .channel('realtime_reels_feed')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lances' }, (payload) => {
                 const lance = payload.new;
                 const ts = new Date(lance.created_at).getTime() / 1000;
@@ -172,7 +148,7 @@ function setupRealtimeSubscription() {
                 };
 
                 allClips.unshift(newClip);
-                newClipsBanner.style.display = 'block';
+                newClipsBanner.style.display = 'flex';
                 showToast("🔥 Novo lance gravado na quadra!");
                 renderStoriesBar();
             })
@@ -190,7 +166,7 @@ function startPolling() {
     }, 6000);
 }
 
-// --- Barra de Stories (Filtros Visuais) ---
+// --- Barra de Stories (Pílulas de Datas) ---
 function renderStoriesBar() {
     const datesMap = {};
     allClips.forEach(clip => {
@@ -202,99 +178,66 @@ function renderStoriesBar() {
     const todayKey = getDayKey(Date.now() / 1000);
 
     let storiesHtml = `
-        <!-- Story: Todos -->
-        <div class="story-item ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">
-            <div class="story-ring">
-                <div class="story-avatar">⚽</div>
-            </div>
-            <span class="story-label">Todos</span>
-        </div>
+        <button class="story-pill ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">
+            <span>⚽ Todos</span>
+        </button>
     `;
-
-    if (favorites.length > 0) {
-        storiesHtml += `
-            <!-- Story: Favoritos -->
-            <div class="story-item ${currentFilter === 'favs' ? 'active' : ''}" onclick="setFilter('favs')">
-                <div class="story-ring">
-                    <div class="story-avatar" style="color: var(--accent-red);">❤️</div>
-                </div>
-                <span class="story-label">Salvos (${favorites.length})</span>
-            </div>
-        `;
-    }
 
     dateKeys.forEach(dKey => {
         const isToday = dKey === todayKey;
         const [yyyy, mm, dd] = dKey.split('-');
-        const label = isToday ? 'Hoje' : `${dd}/${mm}`;
-        const icon = isToday ? '🔥' : '📅';
+        const label = isToday ? '🔥 Hoje' : `📅 ${dd}/${mm}`;
 
         storiesHtml += `
-            <div class="story-item ${currentFilter === dKey ? 'active' : ''}" onclick="setFilter('${dKey}')">
-                <div class="story-ring">
-                    <div class="story-avatar">${icon}</div>
-                </div>
-                <span class="story-label">${label}</span>
-            </div>
+            <button class="story-pill ${currentFilter === dKey ? 'active' : ''}" onclick="setFilter('${dKey}')">
+                <span>${label} (${datesMap[dKey]})</span>
+            </button>
         `;
     });
 
     storiesContainer.innerHTML = storiesHtml;
 }
 
-// --- Filtros e Renderização do Feed Instagram ---
+// --- Filtros e Renderização ---
 function applyFiltersAndRender() {
+    const todayKey = getDayKey(Date.now() / 1000);
+
     filteredClips = allClips.filter(clip => {
-        // 1. Filtro de Favoritos
-        if (currentFilter === 'favs' && !favorites.includes(clip.filename)) {
-            return false;
+        if (currentFilter === 'favs') {
+            return favorites.includes(clip.filename);
         }
-
-        // 2. Filtro de Data
-        if (currentFilter !== 'all' && currentFilter !== 'favs') {
-            const clipDateKey = getDayKey(clip.created_at);
-            if (clipDateKey !== currentFilter && !clip.filename.includes(currentFilter)) {
-                return false;
-            }
+        if (currentFilter === 'today') {
+            return getDayKey(clip.created_at) === todayKey;
         }
-
-        // 3. Filtro de Busca
-        if (searchQuery) {
-            const timeStr = new Date(clip.created_at * 1000).toLocaleTimeString('pt-BR');
-            const matchSearch = clip.filename.toLowerCase().includes(searchQuery) ||
-                                clip.camera_name.toLowerCase().includes(searchQuery) ||
-                                timeStr.includes(searchQuery);
-            if (!matchSearch) return false;
+        if (currentFilter !== 'all') {
+            return getDayKey(clip.created_at) === currentFilter;
         }
-
         return true;
     });
 
-    // Indicador de Filtro Ativo
-    if (currentFilter !== 'all') {
-        feedFilterIndicator.style.display = 'flex';
-        let label = currentFilter === 'favs' ? 'Lances Salvos ❤️' : `Data: ${currentFilter}`;
-        feedFilterText.textContent = `Exibindo: ${label} (${filteredClips.length})`;
-    } else {
-        feedFilterIndicator.style.display = 'none';
-    }
+    updateTopTabsUI();
 
-    renderFeed();
+    if (currentViewMode === 'reels') {
+        renderReelsFeed();
+    } else {
+        renderGridView();
+    }
 }
 
-function renderFeed() {
+// --- MODO 1: RENDERIZAÇÃO DO FEED REELS (Arrastar para Cima) ---
+function renderReelsFeed() {
     if (filteredClips.length === 0) {
-        clipsContainer.innerHTML = `
-            <div style="text-align: center; padding: 3rem 1rem; color: var(--text-secondary);">
-                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚽</div>
-                <p style="font-weight: 800; font-size: 1rem; color: white;">Nenhum lance encontrado</p>
-                <p style="font-size: 0.8rem; margin-top: 4px;">Aperte o botão arcade na quadra para gravar um momento!</p>
+        reelsFeed.innerHTML = `
+            <div class="reels-loading-placeholder">
+                <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚽</div>
+                <p style="font-weight: 800; font-size: 1.1rem; color: #fff;">Nenhum lance encontrado</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted);">Aperte o botão arcade na quadra para gravar um momento!</p>
             </div>
         `;
         return;
     }
 
-    clipsContainer.innerHTML = filteredClips.map((clip, index) => {
+    reelsFeed.innerHTML = filteredClips.map((clip, index) => {
         const isFav = favorites.includes(clip.filename);
         const formattedTime = new Date(clip.created_at * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const timeAgo = formatTimeAgo(clip.created_at);
@@ -302,50 +245,58 @@ function renderFeed() {
         const camLabel = clip.camera_name || extractCameraLabel(clip.filename);
 
         return `
-            <article class="insta-post" data-filename="${clip.filename}">
-                <!-- Cabeçalho do Post -->
-                <div class="post-header">
-                    <div class="post-author-group">
-                        <div class="post-avatar">⚽</div>
-                        <div class="post-meta-text">
-                            <div class="post-author-name">
-                                Arena Momentos <span class="verified-badge">●</span>
-                            </div>
-                            <span class="post-time-ago">Lance às ${formattedTime} • ${timeAgo}</span>
-                        </div>
-                    </div>
-                    <span class="post-cam-pill">${camLabel}</span>
+            <div class="reel-slide" data-filename="${clip.filename}" data-index="${index}">
+                <!-- Fundo desfocado -->
+                <div class="reel-backdrop-blur" style="background-image: url('${clip.thumb_url}');"></div>
+
+                <!-- Vídeo em Stream Preview -->
+                <video class="reel-video" 
+                       playsinline 
+                       loop 
+                       preload="metadata" 
+                       poster="${clip.thumb_url}"
+                       src="${clip.preview_url || clip.video_url}"></video>
+
+                <!-- Coração Gigante (Double-Tap) -->
+                <div class="reel-big-heart">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+                    </svg>
                 </div>
 
-                <!-- Palco de Mídia (Toque para Abrir / Double-Tap para Curtir) -->
-                <div class="post-media-stage" onclick="handlePostMediaClick('${clip.filename}', event)">
-                    <img class="post-thumb-img" src="${clip.thumb_url}" loading="lazy" alt="Lance">
-                    <div class="post-overlay">
-                        <div class="play-bubble-insta">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                        </div>
-                    </div>
+                <!-- Indicador de Play/Pause -->
+                <div class="reel-tap-indicator">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
                 </div>
 
-                <!-- Barra de Ações (Instagram Style) -->
-                <div class="post-actions-bar">
-                    <div class="actions-left">
-                        <!-- Curtir -->
-                        <button class="action-btn btn-like ${isFav ? 'active' : ''}" onclick="toggleFavorite('${clip.filename}', event)" title="Curtir lance">
+                <!-- Barra Lateral Direita de Ações (Reels Style) -->
+                <div class="reel-actions-rail">
+                    <!-- Curtir -->
+                    <button class="action-rail-btn btn-like ${isFav ? 'active' : ''}" 
+                            onclick="toggleFavorite('${clip.filename}', this, event)">
+                        <div class="rail-btn-icon">
                             <svg viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2.2">
                                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                             </svg>
-                        </button>
+                        </div>
+                        <span class="rail-btn-label">${isFav ? 'Salvo' : 'Curtir'}</span>
+                    </button>
 
-                        <!-- Assistir em Câmera Lenta / Reels -->
-                        <button class="action-btn btn-var" onclick="openReelsPlayer('${clip.filename}')" title="Câmera Lenta / VAR">
-                            <span>⚡ VAR Lenta</span>
-                        </button>
+                    <!-- VAR / Câmera Lenta -->
+                    <button class="action-rail-btn btn-var" 
+                            onclick="cycleVarSpeedForSlide(this, event)">
+                        <div class="rail-btn-icon">
+                            <span class="var-speed-badge">1.0x</span>
+                        </div>
+                        <span class="rail-btn-label">VAR Lenta</span>
+                    </button>
 
-                        <!-- WhatsApp -->
-                        <button class="action-btn btn-whatsapp" onclick="shareDirect('${clip.filename}', event)" title="Enviar no WhatsApp">
+                    <!-- WhatsApp -->
+                    <button class="action-rail-btn btn-whatsapp" 
+                            onclick="shareClipDirect('${clip.filename}', event)">
+                        <div class="rail-btn-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                                 <circle cx="18" cy="5" r="3"></circle>
                                 <circle cx="6" cy="12" r="3"></circle>
@@ -353,158 +304,264 @@ function renderFeed() {
                                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
                                 <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                             </svg>
-                        </button>
-                    </div>
+                        </div>
+                        <span class="rail-btn-label">WhatsApp</span>
+                    </button>
 
                     <!-- Baixar Original em Alta Qualidade -->
-                    <a href="${clip.video_url}" download="${clip.filename}" class="action-btn btn-download" onclick="showToast('Iniciando download em Full HD... 💾')" title="Baixar Vídeo Original">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                        </svg>
+                    <a href="${clip.video_url}" 
+                       download="${clip.filename}" 
+                       class="action-rail-btn btn-download" 
+                       onclick="showToast('Iniciando download em Full HD... 💾')">
+                        <div class="rail-btn-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                        </div>
+                        <span class="rail-btn-label">Baixar</span>
                     </a>
                 </div>
 
-                <!-- Legenda do Lance -->
-                <div class="post-caption-box">
-                    <div class="likes-counter">${isFav ? 'Curtido por você ⭐' : 'Toque para assistir e salvar'}</div>
-                    <div class="caption-text">
-                        <strong>Arena Momentos</strong> Lance gravado na ${camLabel} • ${sizeMb} MB
+                <!-- Overlay de Informações e Legenda no Rodapé -->
+                <div class="reel-bottom-overlay">
+                    <div class="reel-author-row">
+                        <div class="reel-avatar-bubble">⚽</div>
+                        <span class="reel-author-name">Arena Momentos</span>
+                        <span class="reel-camera-tag">${camLabel}</span>
+                    </div>
+
+                    <div class="reel-caption-text">
+                        <strong>Lance às ${formattedTime}</strong> • ${timeAgo} • ${sizeMb} MB (Full HD)
+                    </div>
+
+                    <div class="reel-progress-track">
+                        <div class="reel-progress-fill"></div>
                     </div>
                 </div>
-            </article>
+            </div>
+        `;
+    }).join('');
+
+    setupReelsObserver();
+    setupSlideGestures();
+}
+
+// --- Observador de Interseção (Autoplay no vídeo visível / Pause nos outros) ---
+function setupReelsObserver() {
+    if (intersectionObserver) {
+        intersectionObserver.disconnect();
+    }
+
+    const options = {
+        root: reelsFeed,
+        threshold: 0.65
+    };
+
+    intersectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            const slide = entry.target;
+            const video = slide.querySelector('video');
+            const progressFill = slide.querySelector('.reel-progress-fill');
+
+            if (entry.isIntersecting) {
+                currentActiveVideo = video;
+                video.currentTime = 0;
+                video.play().catch(() => {});
+
+                // Vincula atualização de tempo na barra de progresso do slide ativo
+                video.ontimeupdate = () => {
+                    if (video.duration && progressFill) {
+                        const pct = (video.currentTime / video.duration) * 100;
+                        progressFill.style.width = `${pct}%`;
+                    }
+                };
+            } else {
+                video.pause();
+                video.currentTime = 0;
+                video.ontimeupdate = null;
+                if (progressFill) progressFill.style.width = '0%';
+            }
+        });
+    }, options);
+
+    document.querySelectorAll('.reel-slide').forEach(slide => {
+        intersectionObserver.observe(slide);
+    });
+}
+
+// --- Gestos de Toque (Double-Tap para Curtir / Single para Play-Pause) ---
+function setupSlideGestures() {
+    document.querySelectorAll('.reel-slide').forEach(slide => {
+        let lastTap = 0;
+        const video = slide.querySelector('video');
+        const heartAnim = slide.querySelector('.reel-big-heart');
+        const tapIndicator = slide.querySelector('.reel-tap-indicator');
+        const filename = slide.getAttribute('data-filename');
+        const likeBtn = slide.querySelector('.btn-like');
+
+        slide.addEventListener('click', (e) => {
+            // Ignora cliques que vieram dos botões da barra lateral
+            if (e.target.closest('.reel-actions-rail') || e.target.closest('.reel-author-row')) {
+                return;
+            }
+
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+
+            if (tapLength < 300 && tapLength > 0) {
+                // Double-Tap: Curtir lance com explosão do coração! ❤️
+                if (!favorites.includes(filename)) {
+                    toggleFavorite(filename, likeBtn);
+                }
+                heartAnim.classList.add('animate');
+                setTimeout(() => heartAnim.classList.remove('animate'), 650);
+            } else {
+                // Single-Tap: Play / Pause
+                if (video.paused) {
+                    video.play();
+                } else {
+                    video.pause();
+                    tapIndicator.classList.add('show');
+                    setTimeout(() => tapIndicator.classList.remove('show'), 350);
+                }
+            }
+            lastTap = currentTime;
+        });
+    });
+}
+
+// --- Ciclo de Velocidades do VAR para cada Slide ($1.0\times \to 0.5\times \to 0.25\times$) ---
+function cycleVarSpeedForSlide(btn, e) {
+    if (e) e.stopPropagation();
+    const slide = btn.closest('.reel-slide');
+    const video = slide.querySelector('video');
+    const badge = btn.querySelector('.var-speed-badge');
+
+    let currentRate = video.playbackRate;
+    if (currentRate === 1.0) {
+        video.playbackRate = 0.5;
+        badge.textContent = "0.5x";
+        showToast("⚡ Câmera Lenta: 0.5x");
+    } else if (currentRate === 0.5) {
+        video.playbackRate = 0.25;
+        badge.textContent = "0.25x";
+        showToast("⚡ Câmera Super Lenta (VAR): 0.25x");
+    } else {
+        video.playbackRate = 1.0;
+        badge.textContent = "1.0x";
+        showToast("▶️ Velocidade Normal: 1.0x");
+    }
+}
+
+// --- MODO 2: RENDERIZAÇÃO DA GRADE DE EXPLORAR ---
+function renderGridView() {
+    if (filteredClips.length === 0) {
+        gridClipsContainer.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                <p style="font-weight: 800; color: #fff;">Nenhum lance na grade</p>
+            </div>
+        `;
+        return;
+    }
+
+    gridClipsContainer.innerHTML = filteredClips.map((clip, index) => {
+        const formattedTime = new Date(clip.created_at * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        return `
+            <div class="grid-thumb-card" onclick="jumpToReel(${index})">
+                <img class="grid-thumb-img" src="${clip.thumb_url}" loading="lazy" alt="Lance">
+                <span class="grid-thumb-badge">${formattedTime}</span>
+            </div>
         `;
     }).join('');
 }
 
-// --- Interação de Toque no Vídeo (Double-Tap para Curtir / Single para Abrir) ---
-function handlePostMediaClick(filename, event) {
-    const now = Date.now();
-    const timeDiff = now - lastTapTime;
-
-    if (timeDiff < 300 && timeDiff > 0) {
-        // Double-Tap detectado: Curtir lance!
-        if (!favorites.includes(filename)) {
-            toggleFavorite(filename);
-        }
-        showBigHeartAnimation();
-    } else {
-        // Single tap: Abre no modo Reels
-        openReelsPlayer(filename);
+function jumpToReel(index) {
+    toggleViewMode('reels');
+    const targetSlide = document.querySelector(`.reel-slide[data-index="${index}"]`);
+    if (targetSlide) {
+        targetSlide.scrollIntoView({ behavior: 'auto' });
     }
-    lastTapTime = now;
 }
 
-// --- Player em Modo "Reels" / Tela Cheia ---
-function openReelsPlayer(filename) {
-    const clip = allClips.find(c => c.filename === filename);
-    if (!clip) return;
-
-    activeClip = clip;
-    currentVarSpeed = 1.0;
-    const isFav = favorites.includes(filename);
-    const dateFormatted = formatDateTime(clip.created_at);
-    const sizeMb = (clip.size_bytes / (1024 * 1024)).toFixed(1);
-
-    playerTitle.textContent = "Arena Momentos";
-    playerCamBadge.textContent = clip.camera_name;
-    playerMeta.textContent = `Lance gravado às ${dateFormatted} • ${sizeMb} MB (Full HD)`;
-    
-    // Configura botões do Reels
-    btnDownloadClip.href = clip.video_url;
-    btnDownloadClip.setAttribute('download', filename);
-    updateFavUI(isFav);
-    varSpeedIndicator.textContent = "1.0x";
-
-    // Carrega o vídeo com Preview Otimizado
-    atletaVideo.src = clip.preview_url || clip.video_url;
-    atletaVideo.playbackRate = 1.0;
-    atletaVideo.currentTime = 0;
-
-    playerModal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-
-    atletaVideo.play().catch(() => {});
-}
-
-function closeReelsPlayer() {
-    atletaVideo.pause();
-    atletaVideo.src = '';
-    playerModal.classList.remove('active');
-    document.body.style.overflow = '';
-    activeClip = null;
-}
-
-// --- Ciclo de Velocidades do VAR (1.0x -> 0.5x -> 0.25x) ---
-function cycleVarSpeed() {
-    if (!atletaVideo) return;
-
-    if (currentVarSpeed === 1.0) {
-        currentVarSpeed = 0.5;
-        showToast("⚡ Câmera Lenta: 0.5x");
-    } else if (currentVarSpeed === 0.5) {
-        currentVarSpeed = 0.25;
-        showToast("⚡ Câmera Super Lenta (VAR): 0.25x");
-    } else {
-        currentVarSpeed = 1.0;
-        showToast("▶️ Velocidade Normal: 1.0x");
-    }
-
-    atletaVideo.playbackRate = currentVarSpeed;
-    varSpeedIndicator.textContent = `${currentVarSpeed}x`;
-}
-
-// --- Animação de Coração Flutuante ---
-function showBigHeartAnimation() {
-    bigHeart.classList.add('animate');
-    setTimeout(() => {
-        bigHeart.classList.remove('animate');
-    }, 600);
-}
-
-// --- Favoritos ---
-function toggleFavorite(filename, e) {
+// --- Favoritos (Salvos) ---
+function toggleFavorite(filename, btnElement, e) {
     if (e) e.stopPropagation();
 
     const index = favorites.indexOf(filename);
     if (index > -1) {
         favorites.splice(index, 1);
         showToast("Removido dos salvos");
+        if (btnElement) {
+            btnElement.classList.remove('active');
+            btnElement.querySelector('.rail-btn-label').textContent = 'Curtir';
+            btnElement.querySelector('svg').setAttribute('fill', 'none');
+        }
     } else {
         favorites.push(filename);
         showToast("Salvo nos seus lances favoritos ❤️");
-        showBigHeartAnimation();
+        if (btnElement) {
+            btnElement.classList.add('active');
+            btnElement.querySelector('.rail-btn-label').textContent = 'Salvo';
+            btnElement.querySelector('svg').setAttribute('fill', 'currentColor');
+        }
     }
 
     localStorage.setItem('atleta_favs', JSON.stringify(favorites));
     updateFavBadge();
-    renderStoriesBar();
-    applyFiltersAndRender();
 
-    if (activeClip && activeClip.filename === filename) {
-        updateFavUI(favorites.includes(filename));
+    // Se estiver na aba Salvos e descurtir, atualiza o feed
+    if (currentFilter === 'favs') {
+        applyFiltersAndRender();
     }
 }
 
-function updateFavUI(isFav) {
-    btnFavToggle.classList.toggle('active', isFav);
-    favLabel.textContent = isFav ? 'Salvo' : 'Curtir';
-}
-
 function updateFavBadge() {
-    favCountBadge.textContent = favorites.length;
+    topFavCount.textContent = favorites.length;
 }
 
 function setFilter(filterType) {
     currentFilter = filterType;
-    renderStoriesBar();
     applyFiltersAndRender();
+    renderStoriesBar();
+}
+
+function updateTopTabsUI() {
+    tabAll.classList.toggle('active', currentFilter === 'all');
+    tabToday.classList.toggle('active', currentFilter === 'today');
+    tabFavs.classList.toggle('active', currentFilter === 'favs');
+}
+
+// --- Alternância entre Reels e Grade ---
+function toggleViewMode(forcedMode) {
+    if (forcedMode) {
+        currentViewMode = forcedMode;
+    } else {
+        currentViewMode = currentViewMode === 'reels' ? 'grid' : 'reels';
+    }
+
+    if (currentViewMode === 'reels') {
+        reelsFeed.style.display = 'block';
+        gridExplore.style.display = 'none';
+        iconGridView.style.display = 'block';
+        iconReelsView.style.display = 'none';
+        renderReelsFeed();
+    } else {
+        reelsFeed.style.display = 'none';
+        gridExplore.style.display = 'block';
+        iconGridView.style.display = 'none';
+        iconReelsView.style.display = 'block';
+        if (currentActiveVideo) currentActiveVideo.pause();
+        renderGridView();
+    }
 }
 
 // --- Compartilhamento Direto / WhatsApp ---
-async function shareDirect(filename, e) {
+async function shareClipDirect(filename, e) {
     if (e) e.stopPropagation();
 
-    const targetClip = allClips.find(c => c.filename === filename) || activeClip;
+    const targetClip = allClips.find(c => c.filename === filename);
     const videoUrl = targetClip?.video_url || `${API_BASE}/api/clips/${filename}`;
     const shareTitle = `Lance - Momentos`;
     const shareText = `Confira esse lance gravado no Momentos:`;
@@ -535,112 +592,42 @@ function copyToClipboard(url) {
     });
 }
 
-// --- Listeners e Controles de Eventos ---
+// --- Configuração de Eventos Globais ---
 function setupEventListeners() {
-    // Busca
-    btnOpenSearch.addEventListener('click', () => {
-        const isHidden = searchDrawer.style.display === 'none';
-        searchDrawer.style.display = isHidden ? 'block' : 'none';
-        if (isHidden) inputSearch.focus();
-    });
+    tabAll.addEventListener('click', () => setFilter('all'));
+    tabToday.addEventListener('click', () => setFilter('today'));
+    tabFavs.addEventListener('click', () => setFilter('favs'));
 
-    inputSearch.addEventListener('input', (e) => {
-        searchQuery = e.target.value.toLowerCase().trim();
-        applyFiltersAndRender();
-    });
+    btnToggleView.addEventListener('click', () => toggleViewMode());
 
-    btnClearSearch.addEventListener('click', () => {
-        inputSearch.value = '';
-        searchQuery = '';
-        searchDrawer.style.display = 'none';
-        applyFiltersAndRender();
-    });
-
-    btnResetFilter.addEventListener('click', () => {
-        setFilter('all');
-    });
-
-    btnHeaderFavs.addEventListener('click', () => {
-        setFilter(currentFilter === 'favs' ? 'all' : 'favs');
-    });
-
-    // Modal Reels
-    btnClosePlayer.addEventListener('click', closeReelsPlayer);
-    playerBackdrop.addEventListener('click', closeReelsPlayer);
-    btnVarCycle.addEventListener('click', cycleVarSpeed);
-    
-    btnFavToggle.addEventListener('click', () => {
-        if (activeClip) toggleFavorite(activeClip.filename);
-    });
-
-    btnShareClip.addEventListener('click', (e) => {
-        if (activeClip) shareDirect(activeClip.filename, e);
-    });
-
-    // Atualização de Progresso do Vídeo no Reels
-    atletaVideo.addEventListener('timeupdate', () => {
-        if (atletaVideo.duration) {
-            const pct = (atletaVideo.currentTime / atletaVideo.duration) * 100;
-            reelsProgressBar.style.width = `${pct}%`;
-        }
-    });
-
-    // Toque no vídeo do Reels para Pausar/Play
-    atletaVideo.addEventListener('click', () => {
-        if (atletaVideo.paused) {
-            atletaVideo.play();
-        } else {
-            atletaVideo.pause();
-        }
-    });
-
-    // Banner de novos lances
-    btnBannerLoad.addEventListener('click', () => {
+    // Banner de novos lances em tempo real
+    newClipsBanner.addEventListener('click', () => {
         newClipsBanner.style.display = 'none';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
         loadClips(true);
+        if (reelsFeed) reelsFeed.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
-    // Bottom Navigation Tabs
-    navTabFeed.addEventListener('click', () => {
-        setFilter('all');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        updateNavTabs('feed');
-    });
-
-    navTabReels.addEventListener('click', () => {
-        if (allClips.length > 0) {
-            openReelsPlayer(allClips[0].filename);
+    // Navegação por teclado (Seta Cima / Baixo e Espaço)
+    window.addEventListener('keydown', (e) => {
+        if (currentViewMode !== 'reels') return;
+        if (e.key === 'ArrowDown') {
+            reelsFeed.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+        } else if (e.key === 'ArrowUp') {
+            reelsFeed.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+        } else if (e.key === ' ') {
+            e.preventDefault();
+            if (currentActiveVideo) {
+                if (currentActiveVideo.paused) currentActiveVideo.play();
+                else currentActiveVideo.pause();
+            }
         }
     });
-
-    navTabFavs.addEventListener('click', () => {
-        setFilter('favs');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        updateNavTabs('favs');
-    });
-
-    navTabRefresh.addEventListener('click', () => {
-        showToast("Atualizando lances... 🔄");
-        loadClips(true);
-    });
-}
-
-function updateNavTabs(tab) {
-    document.querySelectorAll('.bottom-nav .nav-item').forEach(item => item.classList.remove('active'));
-    if (tab === 'feed') navTabFeed.classList.add('active');
-    if (tab === 'favs') navTabFavs.classList.add('active');
 }
 
 // --- Utilitários ---
 function getDayKey(timestampSec) {
     const d = new Date(timestampSec * 1000);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function formatDateTime(timestampSec) {
-    const d = new Date(timestampSec * 1000);
-    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatTimeAgo(timestampSec) {

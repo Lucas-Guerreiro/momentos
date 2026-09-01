@@ -1,16 +1,16 @@
 [
     {
-        "id": "cam_1787619412",
-        "name": "Ugreen",
-        "source": "2",
-        "buffer_seconds": 30,
-        "fps": 60
-    },
-    {
-        "id": "cam_1787619490",
+        "id": "cam_1788223120",
         "name": "Anker",
         "source": "4",
         "buffer_seconds": 30,
         "fps": 60
+    },
+    {
+        "id": "cam_1788223134",
+        "name": "Ugreen",
+        "source": "2",
+        "buffer_seconds": 30,
+        "fps": 30
     }
 ]

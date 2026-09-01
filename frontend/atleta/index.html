@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MOMENTOS • Feed do Atleta</title>
-    <meta name="description" content="Feed de lances e melhores momentos no estilo Instagram.">
+    <title>MOMENTOS • Reels do Atleta</title>
+    <meta name="description" content="Assista aos lances arrastando para cima no estilo Instagram Reels.">
     <meta name="theme-color" content="#000000">
     <link rel="stylesheet" href="/atleta/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,199 +15,62 @@
 
     <div class="insta-app">
         
-        <!-- Header Estilo Instagram -->
-        <header class="insta-header">
-            <div class="header-left">
-                <div class="insta-logo">
-                    <span class="logo-title">MOMENTOS</span>
-                    <span class="live-dot" title="Transmissão Ativa"></span>
-                </div>
+        <!-- Header Flutuante Superior -->
+        <header class="reels-top-header">
+            <div class="header-brand">
+                <span class="brand-title">MOMENTOS</span>
+                <span class="live-dot" title="Ao Vivo"></span>
             </div>
 
-            <div class="header-right">
-                <button id="btn-open-search" class="header-icon-btn" title="Buscar">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <!-- Abas Rápidas no Topo (Todos / Hoje / Salvos) -->
+            <div class="top-nav-tabs">
+                <button class="top-tab active" data-filter="all" id="tab-all">Todos</button>
+                <button class="top-tab" data-filter="today" id="tab-today">Hoje</button>
+                <button class="top-tab" data-filter="favs" id="tab-favs">Salvos (<span id="top-fav-count">0</span>)</button>
+            </div>
+
+            <div class="header-actions">
+                <button id="btn-toggle-view" class="header-icon-btn" title="Alternar Grade / Reels">
+                    <!-- Ícone de Grade -->
+                    <svg class="icon-grid-view" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                        <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                        <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                        <rect x="3" y="14" width="7" height="7" rx="1"></rect>
                     </svg>
-                </button>
-                <button id="btn-header-favs" class="header-icon-btn" title="Salvos">
-                    <svg class="ico-heart-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    <!-- Ícone de Reels -->
+                    <svg class="icon-reels-view" style="display: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                     </svg>
-                    <span class="fav-badge-count" id="fav-count">0</span>
                 </button>
             </div>
         </header>
 
-        <!-- Barra de Busca Expansível -->
-        <div class="search-drawer" id="search-drawer" style="display: none;">
-            <div class="search-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input type="text" id="input-search" placeholder="Buscar por data, hora ou câmera..." autocomplete="off">
-                <button id="btn-clear-search" class="btn-clear-search">&times;</button>
+        <!-- Barra de Stories Flutuante (Filtro por Datas) -->
+        <div class="stories-bar" id="stories-bar">
+            <div class="stories-scroll" id="stories-container">
+                <!-- Stories inseridos dinamicamente -->
             </div>
         </div>
-
-        <!-- Barra de Stories (Filtros de Datas e Câmeras com Borda Gradiente) -->
-        <section class="stories-section">
-            <div class="stories-wrapper" id="stories-container">
-                <!-- Inserido dinamicamente via JS -->
-            </div>
-        </section>
 
         <!-- Banner Flutuante de Novos Lances (Realtime) -->
-        <div id="new-clips-banner" class="floating-banner" style="display: none;">
-            <div class="banner-inner" id="btn-banner-load">
-                <span class="banner-pulse">🔥</span>
-                <span>Novos lances na quadra! Toque para ver</span>
+        <div id="new-clips-banner" class="floating-realtime-pill" style="display: none;">
+            <span class="pulse-fire">🔥</span>
+            <span>Novo lance na quadra! Toque para ver</span>
+        </div>
+
+        <!-- MODO 1: REELS VERTICAL (Arrastar para Cima / TikTok & Instagram Style) -->
+        <div class="reels-scroll-container" id="reels-feed">
+            <div class="reels-loading-placeholder">
+                <div class="loading-spinner"></div>
+                <p>Carregando lances da quadra...</p>
             </div>
         </div>
 
-        <!-- Feed Principal (Estilo Feed do Instagram) -->
-        <main class="feed-main">
-            <div class="feed-filter-indicator" id="feed-filter-indicator" style="display: none;">
-                <span id="feed-filter-text">Filtrado por: Hoje</span>
-                <button id="btn-reset-filter">Ver Todos</button>
-            </div>
-
-            <div id="clips-container" class="insta-feed-wrapper">
-                <!-- Skeleton Loading -->
-                <div class="insta-skeleton-card">
-                    <div class="sk-header">
-                        <div class="sk-avatar"></div>
-                        <div class="sk-lines">
-                            <div class="sk-line" style="width: 140px;"></div>
-                            <div class="sk-line" style="width: 80px;"></div>
-                        </div>
-                    </div>
-                    <div class="sk-media"></div>
-                </div>
-            </div>
-        </main>
-
-        <!-- Barra de Navegação Inferior Fixa (Bottom Bar) -->
-        <nav class="bottom-nav">
-            <button class="nav-item active" id="nav-tab-feed">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path>
-                </svg>
-                <span>Início</span>
-            </button>
-
-            <button class="nav-item" id="nav-tab-reels">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                </svg>
-                <span>Reels</span>
-            </button>
-
-            <button class="nav-item" id="nav-tab-favs">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                </svg>
-                <span>Salvos</span>
-            </button>
-
-            <button class="nav-item" id="nav-tab-refresh" title="Atualizar">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-                </svg>
-                <span>Atualizar</span>
-            </button>
-        </nav>
-
-        <!-- Player Modal em Modo "Reels" / Tela Cheia -->
-        <div class="reels-modal" id="player-modal">
-            <div class="reels-backdrop" id="player-backdrop"></div>
-            
-            <div class="reels-stage">
-                <video id="atleta-video" playsinline preload="auto" loop></video>
-
-                <!-- Animação de Toque Duplo (Coração Gigante no Centro) -->
-                <div class="big-heart-anim" id="big-heart">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
-                    </svg>
-                </div>
-
-                <!-- Botão Fechar no Topo -->
-                <button class="reels-close-btn" id="btn-close-player">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-
-                <!-- Barra Lateral Direita de Ações (Reels Style) -->
-                <div class="reels-actions-rail">
-                    <!-- Curtir / Favoritar -->
-                    <button class="rail-btn" id="btn-fav-toggle">
-                        <div class="rail-icon-box">
-                            <svg class="ico-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                            </svg>
-                        </div>
-                        <span class="rail-label" id="fav-label">Curtir</span>
-                    </button>
-
-                    <!-- VAR / Câmera Lenta -->
-                    <button class="rail-btn" id="btn-var-cycle">
-                        <div class="rail-icon-box var-box">
-                            <span class="speed-txt" id="var-speed-indicator">1.0x</span>
-                        </div>
-                        <span class="rail-label">VAR Lenta</span>
-                    </button>
-
-                    <!-- WhatsApp -->
-                    <button class="rail-btn rail-btn-whatsapp" id="btn-share-clip">
-                        <div class="rail-icon-box" style="background: rgba(37, 211, 102, 0.2); color: #25d366;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                                <circle cx="18" cy="5" r="3"></circle>
-                                <circle cx="6" cy="12" r="3"></circle>
-                                <circle cx="18" cy="19" r="3"></circle>
-                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                            </svg>
-                        </div>
-                        <span class="rail-label">WhatsApp</span>
-                    </button>
-
-                    <!-- Baixar Original -->
-                    <a class="rail-btn" id="btn-download-clip" download>
-                        <div class="rail-icon-box">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                        </div>
-                        <span class="rail-label">Baixar</span>
-                    </a>
-                </div>
-
-                <!-- Informações e Legenda no Rodapé do Reels -->
-                <div class="reels-bottom-info">
-                    <div class="reels-author-row">
-                        <div class="reels-avatar">⚽</div>
-                        <span class="reels-author-name" id="player-title">Arena Momentos</span>
-                        <span class="reels-badge-pill" id="player-cam-badge">Câmera Principal</span>
-                    </div>
-                    <div class="reels-caption" id="player-meta">
-                        Lance gravado às 20:45 • Full HD
-                    </div>
-                    
-                    <!-- Barra de Progresso Fina no Rodapé -->
-                    <div class="reels-progress-wrap">
-                        <div class="reels-progress-fill" id="reels-progress-bar"></div>
-                    </div>
-                </div>
-            </div>
+        <!-- MODO 2: GRADE / EXPLORAR (Grade de Miniaturas) -->
+        <div class="grid-explore-container" id="grid-explore" style="display: none;">
+            <div class="grid-clips-wrap" id="grid-clips-container"></div>
         </div>
 
         <!-- Toast Flutuante -->
@@ -217,7 +80,6 @@
 
     <!-- Supabase JS Client (Nuvem & Realtime) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Script do Portal do Atleta -->
     <script src="/atleta/js/app.js"></script>
 </body>
 </html>

@@ -1,16 +1,16 @@
 [
     {
-        "camera_id": "cam_1787619412",
-        "binding_type": "gamepad",
-        "key": null,
-        "gamepad_index": 0,
-        "button_index": 1
-    },
-    {
-        "camera_id": "cam_1787619490",
+        "camera_id": "cam_1788223120",
         "binding_type": "gamepad",
         "key": null,
         "gamepad_index": 0,
         "button_index": 0
+    },
+    {
+        "camera_id": "cam_1788223134",
+        "binding_type": "gamepad",
+        "key": null,
+        "gamepad_index": 0,
+        "button_index": 1
     }
 ]
