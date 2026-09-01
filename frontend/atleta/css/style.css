@@ -471,21 +471,11 @@ html, body {
     color: var(--text-secondary);
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
     max-width: 85%;
-    display: flex;
-    align-items: center;
-    gap: 6px;
 }
 
 .reel-caption-text strong {
     color: #fff;
     font-weight: 800;
-}
-
-.ico-lance-bullet {
-    width: 15px;
-    height: 15px;
-    color: #f59e0b;
-    flex-shrink: 0;
 }
 
 /* Barra de Progresso Fina no Rodapé */

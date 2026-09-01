@@ -376,9 +376,6 @@ function renderReelsFeed() {
                     </div>
 
                     <div class="reel-caption-text">
-                        <svg class="ico-lance-bullet" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
                         <strong>Lance às ${formattedTime}</strong> • ${timeAgo} • ${sizeMb} MB
                     </div>
 
@@ -419,13 +416,15 @@ function setupReelsObserver() {
 
                 video.muted = isMuted;
                 video.playbackRate = currentSpeed;
-                video.currentTime = 0;
                 
+                // Só esconde o poster quando o primeiro frame do vídeo realmente estiver desenhado
+                video.onplaying = () => {
+                    if (poster) poster.style.opacity = '0';
+                };
+
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        if (poster) poster.style.opacity = '0';
-                    }).catch(() => {
+                    playPromise.catch(() => {
                         // Se o navegador bloquear áudio, garante mudo e toca
                         video.muted = true;
                         video.play().catch(() => {});
