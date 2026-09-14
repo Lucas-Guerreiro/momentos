@@ -48,6 +48,7 @@ let activeClipFilename = null;
 // --- Inicialização ---
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
+    initAuthSidebarInfo();
     loadCameras();
     loadBindings();
     loadClips();
@@ -202,6 +203,35 @@ function initNavigation() {
             }
         });
     });
+}
+
+// --- Informações de Usuário e Licença na Sidebar ---
+function initAuthSidebarInfo() {
+    const user = window.AuthService ? window.AuthService.getCurrentUser() : null;
+    const nameEl = document.getElementById('sidebar-user-name');
+    const badgeEl = document.getElementById('sidebar-license-badge');
+    const adminLink = document.getElementById('sidebar-admin-link');
+    const btnLogout = document.getElementById('btn-sidebar-logout');
+
+    if (user) {
+        if (nameEl) nameEl.textContent = user.nome || user.email;
+        if (user.role === 'admin' || user.email === 'admin@momentos.com') {
+            if (badgeEl) {
+                badgeEl.textContent = 'GESTOR';
+                badgeEl.style.background = 'rgba(239,68,68,0.2)';
+                badgeEl.style.color = '#fca5a5';
+            }
+            if (adminLink) adminLink.style.display = 'block';
+        }
+    }
+
+    if (btnLogout) {
+        btnLogout.addEventListener('click', () => {
+            if (confirm("Deseja sair do sistema?")) {
+                window.AuthService.logout();
+            }
+        });
+    }
 }
 
 // --- Exibição de Notificações (Toast) ---

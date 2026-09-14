@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOMENTOS • Ativação de Licença & Planos</title>
+    <meta name="description" content="Ative sua licença de uso do sistema MOMENTOS para gravação de lances na arena.">
+    <meta name="theme-color" content="#070a13">
+    
+    <link rel="stylesheet" href="/css/vendas.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="vendas-layout">
+        
+        <!-- Glows de Fundo -->
+        <div class="glow-bg glow-1"></div>
+        <div class="glow-bg glow-2"></div>
+
+        <!-- Header -->
+        <header class="vendas-nav">
+            <div class="brand-group">
+                <div class="brand-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                </div>
+                <div class="brand-names">
+                    <span class="brand-title">MOMENTOS</span>
+                    <span class="brand-badge">ATIVAÇÃO DO SISTEMA</span>
+                </div>
+            </div>
+
+            <div class="user-header-box">
+                <span class="user-name" id="user-display-email">carregando...</span>
+                <button id="btn-logout" class="btn-logout-clean">Sair</button>
+            </div>
+        </header>
+
+        <main class="vendas-container">
+            
+            <!-- Hero Section -->
+            <section class="hero-section">
+                <div class="status-pill">
+                    <span class="status-dot"></span>
+                    <span>Licença Pendente de Ativação</span>
+                </div>
+                <h1 class="hero-title">Liberar Acesso ao Sistema da Arena</h1>
+                <p class="hero-subtitle">
+                    Grave os melhores lances da quadra com corte instantâneo em câmera lenta (VAR) e QR Code direto para os atletas.
+                </p>
+            </section>
+
+            <!-- Card Principal de Ativação de Chave -->
+            <section class="activation-card">
+                <div class="activation-header">
+                    <div class="act-badge">⚡ ATIVAÇÃO IMEDIATA</div>
+                    <h2 class="act-title">Já possui uma Chave de Licença?</h2>
+                    <p class="act-sub">Insira a chave recebida para vincular e liberar o sistema neste aparelho instantaneamente.</p>
+                </div>
+
+                <div id="activation-alert" class="act-alert" style="display: none;"></div>
+
+                <form id="form-activate-key" class="act-form">
+                    <div class="key-input-wrapper">
+                        <input type="text" id="input-license-key" placeholder="MOMENTOS-XXXX-XXXX-XXXX" required autocomplete="off">
+                        <button type="submit" class="btn-activate" id="btn-activate">
+                            <span>Ativar Aparelho</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Informação do Aparelho que será vinculado -->
+                <div class="device-bind-info">
+                    <div class="bind-icon">🔒</div>
+                    <div class="bind-meta">
+                        <span class="bind-label">Aparelho Atual (Será Vinculado):</span>
+                        <strong id="device-info-name" class="bind-name">Detectando dispositivo...</strong>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Planos Comerciais -->
+            <section class="plans-section">
+                <div class="plans-header">
+                    <h2 class="section-title">Ainda não tem licença? Escolha seu plano:</h2>
+                    <p class="section-sub">Ativação rápida com suporte direto via WhatsApp</p>
+                </div>
+
+                <div class="plans-grid">
+                    
+                    <!-- Plano Mensal -->
+                    <div class="plan-card">
+                        <div class="plan-header">
+                            <span class="plan-tag">MENSAL</span>
+                            <h3 class="plan-name">Plano Mensal</h3>
+                            <div class="plan-price">
+                                <span class="currency">R$</span>
+                                <span class="val">Sob Consulta</span>
+                            </div>
+                            <span class="plan-period">Acesso por 30 dias</span>
+                        </div>
+
+                        <ul class="plan-features">
+                            <li>✅ Gravação Full HD em Câmera Lenta (VAR)</li>
+                            <li>✅ Portal do Atleta no estilo Instagram</li>
+                            <li>✅ QR Code automático na quadra</li>
+                            <li>✅ 1 Aparelho / Quadra liberado</li>
+                            <li>✅ Suporte técnico</li>
+                        </ul>
+
+                        <button class="btn-plan-whatsapp" onclick="hirePlan('Plano Mensal')">
+                            <span>Contratar via WhatsApp</span>
+                        </button>
+                    </div>
+
+                    <!-- Plano Trimestral (Destaque) -->
+                    <div class="plan-card featured">
+                        <div class="featured-badge">⭐ MAIS POPULAR</div>
+                        <div class="plan-header">
+                            <span class="plan-tag">TRIMESTRAL</span>
+                            <h3 class="plan-name">Plano Trimestral</h3>
+                            <div class="plan-price">
+                                <span class="currency">R$</span>
+                                <span class="val">Melhor Valor</span>
+                            </div>
+                            <span class="plan-period">Acesso por 90 dias (3 meses)</span>
+                        </div>
+
+                        <ul class="plan-features">
+                            <li>✅ <strong>Tudo do plano mensal</strong></li>
+                            <li>✅ Economia garantida para sua Arena</li>
+                            <li>✅ Atualizações de sistema prioritárias</li>
+                            <li>✅ Armazenamento em nuvem otimizado</li>
+                            <li>✅ Suporte VIP</li>
+                        </ul>
+
+                        <button class="btn-plan-whatsapp featured-btn" onclick="hirePlan('Plano Trimestral')">
+                            <span>Contratar via WhatsApp</span>
+                        </button>
+                    </div>
+
+                    <!-- Plano Anual -->
+                    <div class="plan-card">
+                        <div class="plan-header">
+                            <span class="plan-tag">ANUAL</span>
+                            <h3 class="plan-name">Plano Anual</h3>
+                            <div class="plan-price">
+                                <span class="currency">R$</span>
+                                <span class="val">Máxima Economia</span>
+                            </div>
+                            <span class="plan-period">Acesso por 365 dias (12 meses)</span>
+                        </div>
+
+                        <ul class="plan-features">
+                            <li>✅ Acesso ininterrupto o ano todo</li>
+                            <li>✅ Máximo desconto por mês</li>
+                            <li>✅ Consultoria e configuração remota</li>
+                            <li>✅ Painel administrativo completo</li>
+                            <li>✅ Suporte prioritário 24/7</li>
+                        </ul>
+
+                        <button class="btn-plan-whatsapp" onclick="hirePlan('Plano Anual')">
+                            <span>Contratar via WhatsApp</span>
+                        </button>
+                    </div>
+
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Toast Flutuante -->
+        <div class="floating-toast" id="toast"></div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/js/device_fingerprint.js"></script>
+    <script src="/js/auth_service.js"></script>
+    <script src="/js/auth_guard.js"></script>
+    <script src="/js/vendas.js"></script>
+</body>
+</html>

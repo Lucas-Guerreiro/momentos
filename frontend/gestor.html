@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOMENTOS • Painel do Gestor</title>
+    <meta name="description" content="Gerador e gerenciador de licenças do sistema MOMENTOS.">
+    <meta name="theme-color" content="#070a13">
+    
+    <link rel="stylesheet" href="/css/gestor.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="gestor-layout">
+        
+        <!-- Header Superior -->
+        <header class="gestor-nav">
+            <div class="nav-brand-group">
+                <div class="brand-badge">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-title">MOMENTOS GESTOR</span>
+                    <span class="brand-sub">Controle Central de Licenças & Dispositivos</span>
+                </div>
+            </div>
+
+            <div class="nav-user-actions">
+                <div class="user-pill">
+                    <span class="admin-badge">ADMIN</span>
+                    <span class="user-email" id="header-user-email">admin@momentos.com</span>
+                </div>
+                <a href="/index.html" class="btn-link-arena" title="Abrir Sistema da Arena">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                    <span>Ir para Arena</span>
+                </a>
+                <button id="btn-logout" class="btn-logout" title="Sair">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main class="gestor-container">
+            
+            <!-- Cards de Métricas / KPIs -->
+            <section class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-blue">📋</div>
+                    <div class="kpi-meta">
+                        <span class="kpi-val" id="kpi-total">0</span>
+                        <span class="kpi-label">Total de Licenças</span>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-green">⚡</div>
+                    <div class="kpi-meta">
+                        <span class="kpi-val" id="kpi-ativas">0</span>
+                        <span class="kpi-label">Licenças Ativas</span>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-purple">📱</div>
+                    <div class="kpi-meta">
+                        <span class="kpi-val" id="kpi-aparelhos">0</span>
+                        <span class="kpi-label">Aparelhos Vinculados</span>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-gold">✨</div>
+                    <div class="kpi-meta">
+                        <span class="kpi-val" id="kpi-disponiveis">0</span>
+                        <span class="kpi-label">Chaves Disponíveis</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Card: Gerador de Novas Licenças -->
+            <section class="gestor-card">
+                <div class="card-header">
+                    <div class="card-title-group">
+                        <span class="card-tag">GERADOR</span>
+                        <h2 class="card-title">Criar Nova Licença</h2>
+                    </div>
+                </div>
+
+                <form id="form-create-license" class="gen-form">
+                    <div class="gen-grid">
+                        <div class="form-group">
+                            <label for="lic-plano">Tipo de Plano</label>
+                            <select id="lic-plano" class="form-select">
+                                <option value="mensal" data-days="30">Plano Mensal (30 dias)</option>
+                                <option value="trimestral" data-days="90">Plano Trimestral (90 dias)</option>
+                                <option value="semestral" data-days="180">Plano Semestral (180 dias)</option>
+                                <option value="anual" data-days="365">Plano Anual (365 dias)</option>
+                                <option value="vitalicia" data-days="3650">Vitalícia (10 anos)</option>
+                                <option value="teste_7d" data-days="7">Demonstração / Teste (7 dias)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="lic-dias">Dias de Validade</label>
+                            <input type="number" id="lic-dias" class="form-input" value="30" min="1" max="9999" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="lic-max-devices">Aparelhos Permitidos</label>
+                            <input type="number" id="lic-max-devices" class="form-input" value="1" min="1" max="10" required>
+                        </div>
+
+                        <div class="form-group btn-align">
+                            <button type="submit" class="btn-generate" id="btn-generate">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg>
+                                <span>Gerar Chave</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Box de Licença Recém-Gerada -->
+                <div id="new-license-box" class="new-license-box" style="display: none;">
+                    <div class="new-lic-header">
+                        <span class="new-lic-badge">CHAVE GERADA COM SUCESSO</span>
+                        <span id="new-lic-plan-badge" class="plan-pill">MENSAL • 30 DIAS</span>
+                    </div>
+                    <div class="new-lic-key-row">
+                        <code class="key-code" id="new-lic-key-display">MOMENTOS-XXXX-XXXX-XXXX</code>
+                        <button class="btn-copy-key" id="btn-copy-new-key">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span>Copiar</span>
+                        </button>
+                        <button class="btn-whatsapp-key" id="btn-whatsapp-new-key">
+                            <span>WhatsApp</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Card: Gerenciador de Licenças Cadastradas -->
+            <section class="gestor-card">
+                <div class="card-header flex-between">
+                    <div class="card-title-group">
+                        <span class="card-tag">BASE DE DADOS</span>
+                        <h2 class="card-title">Licenças Cadastradas</h2>
+                    </div>
+
+                    <div class="table-actions">
+                        <input type="text" id="input-search-licenses" class="search-input" placeholder="Buscar por chave, e-mail ou aparelho...">
+                        <button id="btn-refresh-licenses" class="btn-icon-refresh" title="Atualizar">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tabela de Licenças -->
+                <div class="table-responsive">
+                    <table class="gestor-table">
+                        <thead>
+                            <tr>
+                                <th>Chave da Licença</th>
+                                <th>Plano</th>
+                                <th>Status</th>
+                                <th>Cliente / E-mail</th>
+                                <th>Aparelho Vinculado</th>
+                                <th>Expiração</th>
+                                <th style="text-align: right;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="licenses-table-body">
+                            <tr>
+                                <td colspan="7" class="loading-td">Carregando licenças...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Toast Flutuante -->
+        <div class="floating-toast" id="toast"></div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/js/device_fingerprint.js"></script>
+    <script src="/js/auth_service.js"></script>
+    <script src="/js/auth_guard.js"></script>
+    <script src="/js/gestor.js"></script>
+</body>
+</html>

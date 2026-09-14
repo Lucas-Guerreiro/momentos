@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MOMENTOS • Autenticação de Acesso</title>
+    <meta name="description" content="Acesse o sistema MOMENTOS para gestão de cortes e câmeras da quadra.">
+    <meta name="theme-color" content="#070a13">
+    
+    <link rel="stylesheet" href="/css/login.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="login-wrapper">
+        
+        <!-- Glows de Fundo -->
+        <div class="glow-sphere glow-1"></div>
+        <div class="glow-sphere glow-2"></div>
+
+        <div class="login-card">
+            
+            <!-- Cabeçalho / Logo -->
+            <div class="login-header">
+                <div class="brand-logo">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                </div>
+                <h1 class="brand-title">MOMENTOS</h1>
+                <p class="brand-subtitle">Sistema de Recorte & Transmissão de Lances</p>
+            </div>
+
+            <!-- Abas (Entrar / Criar Conta) -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login">Entrar</button>
+                <button class="auth-tab" id="tab-register">Criar Conta</button>
+            </div>
+
+            <!-- Alerta de Mensagem -->
+            <div id="auth-alert" class="auth-alert" style="display: none;"></div>
+
+            <!-- Formulário de Login -->
+            <form id="form-login" class="auth-form">
+                <div class="form-group">
+                    <label for="login-email">E-mail</label>
+                    <div class="input-wrapper">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <input type="email" id="login-email" placeholder="seuemail@exemplo.com" required autocomplete="email">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="login-password">Senha de Acesso</label>
+                    <div class="input-wrapper">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="btn-submit-login">
+                    <span>Entrar no Sistema</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Formulário de Cadastro -->
+            <form id="form-register" class="auth-form" style="display: none;">
+                <div class="form-group">
+                    <label for="reg-nome">Nome da Arena / Usuário</label>
+                    <div class="input-wrapper">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <input type="text" id="reg-nome" placeholder="Ex: Arena Sports Club" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="reg-email">E-mail</label>
+                    <div class="input-wrapper">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <input type="email" id="reg-email" placeholder="contato@arena.com" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="reg-password">Criar Senha</label>
+                    <div class="input-wrapper">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres" minlength="6" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="btn-submit-reg">
+                    <span>Criar Conta e Prosseguir</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Identificador de Aparelho (Device Binding Info) -->
+            <div class="device-badge-box">
+                <div class="device-icon">🔒</div>
+                <div class="device-meta">
+                    <span class="device-label">Aparelho Detectado</span>
+                    <span class="device-id-txt" id="device-id-display">Detectando dispositivo...</span>
+                </div>
+            </div>
+
+            <!-- Dica de Acesso Rápido -->
+            <div class="demo-hints">
+                <span>🔑 Gestor: <code>admin@momentos.com</code> / <code>admin123</code></span>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/js/device_fingerprint.js"></script>
+    <script src="/js/auth_service.js"></script>
+    <script src="/js/auth_guard.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Exibe o ID do aparelho detectado
+            if (window.DeviceFingerprint) {
+                const dev = window.DeviceFingerprint.getDevice();
+                document.getElementById('device-id-display').textContent = `${dev.friendlyName} • ${dev.deviceId}`;
+            }
+
+            // Alternância de Abas
+            const tabLogin = document.getElementById('tab-login');
+            const tabRegister = document.getElementById('tab-register');
+            const formLogin = document.getElementById('form-login');
+            const formRegister = document.getElementById('form-register');
+            const alertBox = document.getElementById('auth-alert');
+
+            tabLogin.addEventListener('click', () => {
+                tabLogin.classList.add('active');
+                tabRegister.classList.remove('active');
+                formLogin.style.display = 'block';
+                formRegister.style.display = 'none';
+                alertBox.style.display = 'none';
+            });
+
+            tabRegister.addEventListener('click', () => {
+                tabRegister.classList.add('active');
+                tabLogin.classList.remove('active');
+                formRegister.style.display = 'block';
+                formLogin.style.display = 'none';
+                alertBox.style.display = 'none';
+            });
+
+            function showAlert(msg, isError = true) {
+                alertBox.textContent = msg;
+                alertBox.className = `auth-alert ${isError ? 'error' : 'success'}`;
+                alertBox.style.display = 'block';
+            }
+
+            // Submit Login
+            formLogin.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                const pass = document.getElementById('login-password').value;
+                const btn = document.getElementById('btn-submit-login');
+
+                btn.disabled = true;
+                btn.innerHTML = '<span>Verificando licença e aparelho...</span>';
+
+                try {
+                    const res = await window.AuthService.login(email, pass);
+                    if (res.success) {
+                        showAlert("Login realizado com sucesso! Redirecionando...", false);
+                        setTimeout(() => {
+                            window.location.href = res.destination;
+                        }, 500);
+                    } else {
+                        showAlert(res.error || "Falha ao realizar login.");
+                        btn.disabled = false;
+                        btn.innerHTML = '<span>Entrar no Sistema</span>';
+                    }
+                } catch (err) {
+                    showAlert("Erro de conexão.");
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>Entrar no Sistema</span>';
+                }
+            });
+
+            // Submit Cadastro
+            formRegister.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const nome = document.getElementById('reg-nome').value;
+                const email = document.getElementById('reg-email').value;
+                const pass = document.getElementById('reg-password').value;
+                const btn = document.getElementById('btn-submit-reg');
+
+                btn.disabled = true;
+                btn.innerHTML = '<span>Criando conta...</span>';
+
+                try {
+                    const res = await window.AuthService.register(email, pass, nome);
+                    if (res.success) {
+                        showAlert("Conta criada com sucesso! Redirecionando...", false);
+                        setTimeout(() => {
+                            window.location.href = res.destination;
+                        }, 500);
+                    } else {
+                        showAlert(res.error || "Erro ao criar conta.");
+                        btn.disabled = false;
+                        btn.innerHTML = '<span>Criar Conta e Prosseguir</span>';
+                    }
+                } catch (err) {
+                    showAlert("Erro ao conectar com o servidor.");
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>Criar Conta e Prosseguir</span>';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
