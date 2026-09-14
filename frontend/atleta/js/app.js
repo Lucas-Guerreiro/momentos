@@ -277,6 +277,8 @@ function renderReelsFeed() {
         const timeAgo = formatTimeAgo(clip.created_at);
         const sizeMb = (clip.size_bytes / (1024 * 1024)).toFixed(1);
         const camLabel = clip.camera_name || extractCameraLabel(clip.filename);
+        const videoSrc = clip.preview_url || clip.video_url;
+        const isFirst = index === 0;
 
         return `
             <div class="reel-slide" data-filename="${clip.filename}" data-index="${index}">
@@ -284,17 +286,21 @@ function renderReelsFeed() {
                 <div class="reel-backdrop-blur" style="background-image: url('${clip.thumb_url}');"></div>
 
                 <!-- Imagem de Poster sempre visível como fallback (sem tela preta) -->
-                <img class="reel-poster-fallback" src="${clip.thumb_url}" alt="Lance" loading="eager">
+                <img class="reel-poster-fallback" src="${clip.thumb_url}" alt="Lance" loading="${isFirst ? 'eager' : 'lazy'}" onerror="this.style.display='none'">
 
-                <!-- Vídeo em Stream Preview -->
+                <!-- Vídeo em Stream Preview (Lazy Loaded) -->
                 <video class="reel-video" 
                        playsinline 
                        webkit-playsinline
                        muted
                        loop 
-                       preload="auto" 
+                       preload="${isFirst ? 'auto' : 'none'}" 
                        poster="${clip.thumb_url}"
-                       src="${clip.preview_url || clip.video_url}"></video>
+                       ${isFirst ? `src="${videoSrc}#t=0.001"` : ''}
+                       data-src="${videoSrc}#t=0.001"></video>
+
+                <!-- Badge de Zoom por Pinça -->
+                <div class="reel-zoom-badge">🔍 1.0x Zoom</div>
 
                 <!-- Coração Gigante (Double-Tap) -->
                 <div class="reel-big-heart">
@@ -391,7 +397,7 @@ function renderReelsFeed() {
     setupSlideGestures();
 }
 
-// --- Observador de Interseção (Autoplay no vídeo visível / Pause nos outros) ---
+// --- Observador de Interseção (Lazy Loading & Autoplay no slide ativo) ---
 function setupReelsObserver() {
     if (intersectionObserver) {
         intersectionObserver.disconnect();
@@ -414,10 +420,25 @@ function setupReelsObserver() {
                 currentActiveSlide = slide;
                 activeSlideIndex = parseInt(slide.getAttribute('data-index') || '0');
 
+                // Carrega source sob demanda se ainda não estiver carregado
+                if (!video.src && video.getAttribute('data-src')) {
+                    video.src = video.getAttribute('data-src');
+                }
+
+                // Preload do próximo slide
+                const nextSlide = document.querySelector(`.reel-slide[data-index="${activeSlideIndex + 1}"]`);
+                if (nextSlide) {
+                    const nextVid = nextSlide.querySelector('video');
+                    if (nextVid && !nextVid.src && nextVid.getAttribute('data-src')) {
+                        nextVid.src = nextVid.getAttribute('data-src');
+                        nextVid.preload = 'metadata';
+                    }
+                }
+
                 video.muted = isMuted;
                 video.playbackRate = currentSpeed;
                 
-                // Só esconde o poster quando o primeiro frame do vídeo realmente estiver desenhado
+                // Transiciona suavemente assim que o vídeo desenhar o frame
                 video.onplaying = () => {
                     if (poster) poster.style.opacity = '0';
                 };
@@ -425,7 +446,6 @@ function setupReelsObserver() {
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
                     playPromise.catch(() => {
-                        // Se o navegador bloquear áudio, garante mudo e toca
                         video.muted = true;
                         video.play().catch(() => {});
                     });
@@ -453,16 +473,123 @@ function setupReelsObserver() {
     });
 }
 
-// --- Gestos de Toque (Double-Tap para Curtir / Single para Play-Pause) ---
+// --- Gestos de Toque (Double-Tap para Curtir / Pinch-to-Zoom de 2 Dedos / Panning) ---
 function setupSlideGestures() {
     document.querySelectorAll('.reel-slide').forEach(slide => {
         let lastTap = 0;
         const video = slide.querySelector('video');
+        const poster = slide.querySelector('.reel-poster-fallback');
         const heartAnim = slide.querySelector('.reel-big-heart');
         const tapIndicator = slide.querySelector('.reel-tap-indicator');
+        const zoomBadge = slide.querySelector('.reel-zoom-badge');
         const filename = slide.getAttribute('data-filename');
         const likeBtn = slide.querySelector('.btn-like');
 
+        // Estado do Pinch-to-Zoom
+        let scale = 1;
+        let lastScale = 1;
+        let posX = 0;
+        let posY = 0;
+        let startX = 0;
+        let startY = 0;
+        let initialDistance = 0;
+        let isPinching = false;
+        let isPanning = false;
+
+        function updateTransform() {
+            if (scale < 1) scale = 1;
+            if (scale > 4.5) scale = 4.5;
+
+            const maxPanX = (scale - 1) * (slide.clientWidth / 2);
+            const maxPanY = (scale - 1) * (slide.clientHeight / 2);
+            posX = Math.max(-maxPanX, Math.min(maxPanX, posX));
+            posY = Math.max(-maxPanY, Math.min(maxPanY, posY));
+
+            const transformStr = `translate3d(${posX}px, ${posY}px, 0) scale(${scale})`;
+            if (video) video.style.transform = transformStr;
+            if (poster) poster.style.transform = transformStr;
+
+            if (scale > 1.05) {
+                slide.classList.add('is-zoomed');
+                if (zoomBadge) {
+                    zoomBadge.textContent = `🔍 ${scale.toFixed(1)}x Zoom (Toque duplo para resetar)`;
+                    zoomBadge.style.opacity = '1';
+                }
+            } else {
+                slide.classList.remove('is-zoomed');
+                if (zoomBadge) zoomBadge.style.opacity = '0';
+                posX = 0;
+                posY = 0;
+            }
+        }
+
+        function resetZoom() {
+            scale = 1;
+            lastScale = 1;
+            posX = 0;
+            posY = 0;
+            if (video) {
+                video.style.transition = 'transform 0.25s ease';
+                setTimeout(() => { if (video) video.style.transition = ''; }, 250);
+            }
+            if (poster) {
+                poster.style.transition = 'transform 0.25s ease';
+                setTimeout(() => { if (poster) poster.style.transition = ''; }, 250);
+            }
+            updateTransform();
+        }
+
+        function getDistance(t1, t2) {
+            return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        }
+
+        // Touch Listeners: Pinça com 2 dedos e Pan com 1 dedo
+        slide.addEventListener('touchstart', (e) => {
+            if (e.target.closest('.reel-actions-rail') || e.target.closest('.reel-author-row')) return;
+
+            if (e.touches.length === 2) {
+                isPinching = true;
+                initialDistance = getDistance(e.touches[0], e.touches[1]);
+                lastScale = scale;
+                e.preventDefault();
+            } else if (e.touches.length === 1 && scale > 1.05) {
+                isPanning = true;
+                startX = e.touches[0].clientX - posX;
+                startY = e.touches[0].clientY - posY;
+            }
+        }, { passive: false });
+
+        slide.addEventListener('touchmove', (e) => {
+            if (isPinching && e.touches.length === 2) {
+                e.preventDefault();
+                const currentDistance = getDistance(e.touches[0], e.touches[1]);
+                if (initialDistance > 0) {
+                    const diff = currentDistance / initialDistance;
+                    scale = lastScale * diff;
+                    updateTransform();
+                }
+            } else if (isPanning && e.touches.length === 1 && scale > 1.05) {
+                e.preventDefault();
+                posX = e.touches[0].clientX - startX;
+                posY = e.touches[0].clientY - startY;
+                updateTransform();
+            }
+        }, { passive: false });
+
+        slide.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) {
+                isPinching = false;
+                lastScale = scale;
+            }
+            if (e.touches.length === 0) {
+                isPanning = false;
+                if (scale <= 1.05) {
+                    resetZoom();
+                }
+            }
+        });
+
+        // Clique e Double-Tap
         slide.addEventListener('click', (e) => {
             if (e.target.closest('.reel-actions-rail') || e.target.closest('.reel-author-row')) {
                 return;
@@ -472,20 +599,24 @@ function setupSlideGestures() {
             const tapLength = currentTime - lastTap;
 
             if (tapLength < 300 && tapLength > 0) {
-                // Double-Tap: Curtir lance com coração gigante!
-                if (!favorites.includes(filename)) {
-                    toggleFavorite(filename, likeBtn);
-                }
-                heartAnim.classList.add('animate');
-                setTimeout(() => heartAnim.classList.remove('animate'), 650);
-            } else {
-                // Single-Tap: Play / Pause
-                if (video.paused) {
-                    video.play();
+                if (scale > 1.05) {
+                    resetZoom();
                 } else {
-                    video.pause();
-                    tapIndicator.classList.add('show');
-                    setTimeout(() => tapIndicator.classList.remove('show'), 350);
+                    if (!favorites.includes(filename)) {
+                        toggleFavorite(filename, likeBtn);
+                    }
+                    heartAnim.classList.add('animate');
+                    setTimeout(() => heartAnim.classList.remove('animate'), 650);
+                }
+            } else {
+                if (scale <= 1.05) {
+                    if (video.paused) {
+                        video.play();
+                    } else {
+                        video.pause();
+                        tapIndicator.classList.add('show');
+                        setTimeout(() => tapIndicator.classList.remove('show'), 350);
+                    }
                 }
             }
             lastTap = currentTime;
@@ -557,9 +688,9 @@ function renderGridView() {
             <div class="grid-thumb-card" onclick="jumpToReel(${index})">
                 <img class="grid-thumb-img" 
                      src="${clip.thumb_url}" 
-                     loading="eager" 
+                     loading="lazy" 
                      alt="Lance"
-                     onerror="this.style.opacity='0.5'">
+                     onerror="this.style.opacity='0.4'">
                 <div class="grid-card-overlay">
                     <div class="grid-card-top">
                         <svg class="grid-play-icon" viewBox="0 0 24 24" fill="currentColor">

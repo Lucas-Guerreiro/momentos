@@ -88,6 +88,31 @@ def generate_optimized_preview(input_path: str, output_path: str) -> bool:
         logger.warning(f"Aviso ao gerar preview otimizado com FFmpeg: {e}")
         return False
 
+def generate_thumbnail_file(input_path: str, output_path: str) -> bool:
+    """
+    Gera miniatura JPEG leve a partir do frame 10 do vídeo.
+    """
+    try:
+        import cv2
+        cap = cv2.VideoCapture(input_path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 10)
+        ret, frame = cap.read()
+        if not ret:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = cap.read()
+        cap.release()
+
+        if ret and frame is not None:
+            h, w = frame.shape[:2]
+            target_w = 480
+            target_h = int(target_w * h / w) if w > 0 else 270
+            resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
+            cv2.imwrite(output_path, resized, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            return True
+    except Exception as e:
+        logger.warning(f"Aviso ao gerar miniatura com OpenCV: {e}")
+    return False
+
 def save_lance_record(filename: str, video_url: str, thumb_url: str, preview_url: str, camera_name: str, size_bytes: int, created_at_ts: float):
     """
     Salva ou atualiza o registro do lance na tabela 'lances' do Supabase.
@@ -163,8 +188,12 @@ def upload_clip_worker(file_path: str, camera_name: str = "Câmera Principal"):
 
         # 3. Gera e envia a miniatura JPEG
         thumbs_dir = os.path.join(os.path.dirname(file_path), ".thumbs")
+        os.makedirs(thumbs_dir, exist_ok=True)
         thumb_path = os.path.join(thumbs_dir, f"{filename}.jpg")
         thumb_url = None
+
+        if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
+            generate_thumbnail_file(file_path, thumb_path)
 
         if os.path.exists(thumb_path):
             try:
