@@ -1105,16 +1105,39 @@ function renderClips() {
             
             const targetClip = groupClips.find(c => c.filename === clip.filename) || clip;
             const thumbUrl = targetClip.thumb_url || `${API_BASE}/api/clips/${clip.filename}/thumb`;
+            const previewUrl = targetClip.preview_url || targetClip.video_url || `${API_BASE}/api/clips/${clip.filename}`;
 
             return `
                 <div class="clip-card" onclick="openPlayer('${clip.filename}')">
-                    <div class="clip-thumbnail">
-                        <!-- Ícone de play grande no hover -->
+                    <div class="clip-thumbnail"
+                         onmouseenter="handleClipThumbMouseEnter(this, '${previewUrl}')"
+                         onmousemove="handleClipThumbMouseMove(this, event)"
+                         onmouseleave="handleClipThumbMouseLeave(this)"
+                         ontouchstart="handleClipThumbTouch(this, event, '${previewUrl}')"
+                         ontouchmove="handleClipThumbTouch(this, event, '${previewUrl}')"
+                         ontouchend="handleClipThumbMouseLeave(this)">
+                        
+                        <!-- Miniatura estática base ultra leve -->
+                        <img class="clip-thumbnail-img" src="${thumbUrl}" loading="lazy" alt="${clip.filename}">
+                        
+                        <!-- Vídeo dinâmico de preview contínuo / scrubbing de cenas -->
+                        <video class="clip-hover-video" muted playsinline loop preload="none"></video>
+
+                        <!-- Indicador flutuante de navegação rápida -->
+                        <div class="clip-scrub-hint">⚡ Passe o mouse para navegar pelas cenas</div>
+
+                        <!-- Barra de progresso de cena -->
+                        <div class="clip-scrub-overlay">
+                            <div class="clip-scrub-track">
+                                <div class="clip-scrub-progress"></div>
+                            </div>
+                            <div class="clip-scrub-time">00:00</div>
+                        </div>
+
+                        <!-- Ícone de Play centralizado -->
                         <svg class="play-icon" viewBox="0 0 24 24">
                             <path d="M8 5v14l11-7z"></path>
                         </svg>
-                        <!-- Miniatura ultra leve e rápida (10KB) -->
-                        <img class="clip-thumbnail-img" src="${thumbUrl}" loading="lazy" alt="${clip.filename}">
                     </div>
                     <div class="clip-info">
                         <div class="clip-name" title="${clip.filename}">${clip.filename}</div>
@@ -1147,6 +1170,70 @@ function renderClips() {
             </div>
         `;
     }).join('');
+}
+
+// --- Filmstrip / Hover Scrubbing Interativo na Galeria ---
+function handleClipThumbMouseEnter(container, videoSrc) {
+    const video = container.querySelector('.clip-hover-video');
+    if (!video) return;
+
+    if (!video.src || video.src !== videoSrc) {
+        video.src = videoSrc;
+    }
+
+    video.onloadeddata = () => {
+        video.classList.add('active');
+        video.play().catch(() => {});
+    };
+
+    if (video.readyState >= 2) {
+        video.classList.add('active');
+        video.play().catch(() => {});
+    }
+}
+
+function handleClipThumbMouseMove(container, event) {
+    const video = container.querySelector('.clip-hover-video');
+    const progressBar = container.querySelector('.clip-scrub-progress');
+    const timeText = container.querySelector('.clip-scrub-time');
+    if (!video || !video.duration) return;
+
+    const rect = container.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+
+    if (progressBar) progressBar.style.width = (pct * 100) + '%';
+    
+    // Pausa e busca a cena proporcional à posição do mouse
+    video.pause();
+    video.currentTime = pct * video.duration;
+
+    if (timeText) {
+        const curSec = Math.floor(video.currentTime);
+        timeText.textContent = `00:${curSec.toString().padStart(2, '0')}`;
+    }
+}
+
+function handleClipThumbMouseLeave(container) {
+    const video = container.querySelector('.clip-hover-video');
+    const progressBar = container.querySelector('.clip-scrub-progress');
+    const timeText = container.querySelector('.clip-scrub-time');
+
+    if (video) {
+        video.pause();
+        video.currentTime = 0;
+        video.classList.remove('active');
+    }
+
+    if (progressBar) progressBar.style.width = '0%';
+    if (timeText) timeText.textContent = '00:00';
+}
+
+function handleClipThumbTouch(container, event, videoSrc) {
+    if (event.touches && event.touches.length > 0) {
+        const touch = event.touches[0];
+        handleClipThumbMouseEnter(container, videoSrc);
+        handleClipThumbMouseMove(container, { clientX: touch.clientX });
+    }
 }
 
 // --- Player de Preview Personalizado ---

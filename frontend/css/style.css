@@ -616,41 +616,113 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
 }
 
-.clip-thumbnail svg.play-icon {
-    width: 48px;
-    height: 48px;
-    fill: rgba(255, 255, 255, 0.8);
-    opacity: 0;
-    transition: var(--transition);
-    z-index: 2;
-}
-
-.clip-card:hover .clip-thumbnail svg.play-icon {
-    opacity: 1;
-    transform: scale(1.1);
-}
-
-.clip-thumbnail::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    opacity: 0;
-    transition: var(--transition);
-}
-
-.clip-card:hover .clip-thumbnail::after {
-    opacity: 1;
-}
-
-.clip-video-tag, .clip-thumbnail-img {
+.clip-thumbnail-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    pointer-events: none;
     display: block;
+    transition: transform 0.3s ease;
+}
+
+.clip-hover-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.clip-hover-video.active {
+    opacity: 1;
+}
+
+.clip-scrub-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 6px 10px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, transparent 100%);
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.clip-card:hover .clip-scrub-overlay {
+    opacity: 1;
+}
+
+.clip-scrub-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.clip-scrub-progress {
+    width: 0%;
+    height: 100%;
+    background: #3b82f6;
+    transition: width 0.05s linear;
+}
+
+.clip-scrub-time {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #fff;
+    font-family: monospace;
+}
+
+.clip-scrub-hint {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #93c5fd;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.clip-card:hover .clip-scrub-hint {
+    opacity: 1;
+}
+
+.clip-thumbnail svg.play-icon {
+    width: 44px;
+    height: 44px;
+    fill: rgba(255, 255, 255, 0.85);
+    opacity: 0;
+    transition: var(--transition);
+    z-index: 4;
+    position: absolute;
+    pointer-events: none;
+}
+
+.clip-card:hover .clip-thumbnail svg.play-icon {
+    opacity: 0.8;
+    transform: scale(1.1);
 }
 
 .clip-info {
