@@ -324,6 +324,45 @@
         return { success: false, error: "Chave inválida. Formato esperado: MOMENTOS-XXXX-XXXX" };
     }
 
+    const LOCAL_LICENSES_KEY = "momentos_stored_licenses";
+
+    function getLocalLicenses() {
+        try {
+            const raw = localStorage.getItem(LOCAL_LICENSES_KEY);
+            if (raw) return JSON.parse(raw);
+        } catch(e) {}
+        
+        // Licenças Iniciais Padrão
+        const defaults = [
+            {
+                id: 'lic-demo-1',
+                chave: 'MOMENTOS-VIP-2026',
+                tipo_plano: 'mensal',
+                dias_validade: 30,
+                status: 'disponivel',
+                created_at: new Date().toISOString()
+            },
+            {
+                id: 'lic-demo-2',
+                chave: 'MOMENTOS-ARENA-PRO-7D',
+                tipo_plano: 'teste_7d',
+                dias_validade: 7,
+                status: 'disponivel',
+                created_at: new Date(Date.now() - 3600000).toISOString()
+            }
+        ];
+        try {
+            localStorage.setItem(LOCAL_LICENSES_KEY, JSON.stringify(defaults));
+        } catch(e) {}
+        return defaults;
+    }
+
+    function saveLocalLicenses(list) {
+        try {
+            localStorage.setItem(LOCAL_LICENSES_KEY, JSON.stringify(list));
+        } catch(e) {}
+    }
+
     // --- Funções de Gestão de Licenças (Apenas para Gestores / Admin) ---
     function generateLicenseCode() {
         const seg1 = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -335,46 +374,62 @@
     async function createLicense(tipoPlano, diasValidade, maxDispositivos = 1) {
         const chave = generateLicenseCode();
         const newLic = {
+            id: 'lic-' + Date.now(),
             chave: chave,
             tipo_plano: tipoPlano || 'mensal',
             dias_validade: parseInt(diasValidade) || 30,
             status: 'disponivel',
-            max_dispositivos: maxDispositivos
+            max_dispositivos: maxDispositivos,
+            created_at: new Date().toISOString()
         };
+
+        // Salva imediatamente no cache local
+        const currentLocal = getLocalLicenses();
+        currentLocal.unshift(newLic);
+        saveLocalLicenses(currentLocal);
 
         if (supabase) {
             try {
-                const { data, error } = await supabase
-                    .from('licencas')
-                    .insert([newLic])
-                    .select()
-                    .single();
-
-                if (!error && data) return { success: true, license: data };
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
+                const dbPromise = supabase.from('licencas').insert([newLic]).select().single();
+                const res = await Promise.race([dbPromise, timeoutPromise]);
+                if (res && res.data) {
+                    return { success: true, license: res.data };
+                }
             } catch (e) {
-                console.warn("Aviso ao criar licença no Supabase:", e);
+                console.warn("Aviso ao criar licença no Supabase (salva localmente):", e);
             }
         }
 
-        newLic.id = 'lic-' + Date.now();
-        newLic.created_at = new Date().toISOString();
         return { success: true, license: newLic };
     }
 
     async function listLicenses() {
+        const localList = getLocalLicenses();
+
         if (supabase) {
             try {
-                const { data, error } = await supabase
-                    .from('licencas')
-                    .select('*')
-                    .order('created_at', { ascending: false });
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500));
+                const dbPromise = supabase.from('licencas').select('*').order('created_at', { ascending: false });
+                const { data, error } = await Promise.race([dbPromise, timeoutPromise]);
 
-                if (!error && data) return data;
+                if (!error && data && data.length > 0) {
+                    // Mescla com locais para não perder chaves offline
+                    const mergedMap = new Map();
+                    data.forEach(item => mergedMap.set(item.chave, item));
+                    localList.forEach(item => {
+                        if (!mergedMap.has(item.chave)) mergedMap.set(item.chave, item);
+                    });
+                    const finalMerged = Array.from(mergedMap.values());
+                    saveLocalLicenses(finalMerged);
+                    return finalMerged;
+                }
             } catch (e) {
-                console.warn("Aviso ao listar licenças:", e);
+                console.warn("Aviso ao listar licenças (usando dados locais):", e);
             }
         }
-        return [];
+
+        return localList;
     }
 
     async function unbindDevice(licenseId) {
