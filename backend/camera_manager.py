@@ -10,6 +10,21 @@ from collections import deque
 # Configuração simples de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+class RecordingJob:
+    """
+    Representa uma tarefa de gravação assíncrona individual.
+    Permite múltiplos disparos consecutivos sem bloqueios ou perdas de lances.
+    """
+    def __init__(self, job_id, output_path, measured_fps, frames_needed, callback=None):
+        self.job_id = job_id
+        self.output_path = output_path
+        self.measured_fps = measured_fps
+        self.frames_needed = frames_needed
+        self.frames_written = 0
+        self.queue = queue.Queue(maxsize=2000)
+        self.callback = callback
+        self.thread = None
+
 class CameraCapture:
     def __init__(self, camera_id, source, name="Camera", buffer_seconds=10, fps_override=None):
         self.camera_id = camera_id
@@ -38,13 +53,9 @@ class CameraCapture:
         self.last_preview_lock = threading.Lock()
         self.last_preview_request_time = 0.0
         
-        # Gerenciamento da gravação ativa de recortes (clipes) assíncrona
-        self.write_queue = None
-        self.writer_thread = None
-        self.recording_active = False
-        self.recording_frames_needed = 0
-        self.recording_frames_written = 0
-        self.recording_lock = threading.Lock()
+        # Gerenciamento multi-gravação assíncrona concorrente (suporta disparos consecutivos ilimitados)
+        self.active_jobs = []
+        self.jobs_lock = threading.Lock()
         
         # Callback opcional quando um vídeo termina de ser gravado
         self.on_recording_finished = None
@@ -62,10 +73,13 @@ class CameraCapture:
             self.thread.join(timeout=2)
             self.thread = None
         
-        with self.recording_lock:
-            self.recording_active = False
-            if self.write_queue is not None:
-                self.write_queue.put(None)
+        with self.jobs_lock:
+            for job in self.active_jobs:
+                try:
+                    job.queue.put_nowait(None)
+                except Exception:
+                    pass
+            self.active_jobs.clear()
                 
         if self.cap:
             self.cap.release()
@@ -241,15 +255,26 @@ class CameraCapture:
                         with self.last_preview_lock:
                             self.last_preview_jpeg = jpeg.tobytes()
 
-                # Envia frame para a fila de gravação se estiver gravando
-                with self.recording_lock:
-                    if self.recording_active and self.write_queue is not None:
-                        if self.recording_frames_written < self.recording_frames_needed:
-                            self.write_queue.put(frame.copy())
-                            self.recording_frames_written += 1
-                        else:
-                            self.recording_active = False
-                            self.write_queue.put(None)  # Sentinel para parar o gravador
+                # Envia frame para todas as filas de gravação ativas concorrentes
+                with self.jobs_lock:
+                    if self.active_jobs:
+                        finished_jobs = []
+                        for job in self.active_jobs:
+                            if job.frames_written < job.frames_needed:
+                                try:
+                                    job.queue.put_nowait(frame.copy())
+                                    job.frames_written += 1
+                                except queue.Full:
+                                    pass
+                            else:
+                                try:
+                                    job.queue.put_nowait(None)  # Sentinel para parar o gravador
+                                except Exception:
+                                    pass
+                                finished_jobs.append(job)
+
+                        for fj in finished_jobs:
+                            self.active_jobs.remove(fj)
 
                 # Controla taxa de quadros apenas se a fonte for arquivo (para simular tempo real), 
                 # streams e webcams já bloqueiam naturalmente no frame rate do hardware
@@ -273,10 +298,14 @@ class CameraCapture:
             self.buffer = deque(old_buffer, maxlen=new_max_size)
             logging.info(f"Câmera [{self.name}]: Buffer aumentado dinamicamente para {new_seconds}s ({new_max_size} frames).")
 
-    def _write_worker(self, output_path, frames_snapshot, fps_to_use, callback):
-        logging.info(f"Iniciando gravação de vídeo assíncrona para [{self.name}] a {fps_to_use:.2f} FPS...")
+    def _write_worker_job(self, job, frames_snapshot):
+        output_path = job.output_path
+        fps_to_use = job.measured_fps
+        callback = job.callback
+
+        logging.info(f"Iniciando gravação assíncrona do job [{job.job_id}] para [{self.name}] a {fps_to_use:.2f} FPS...")
         if not frames_snapshot:
-            logging.error(f"Nenhum frame inicial para gravar na câmera [{self.name}].")
+            logging.error(f"Nenhum frame inicial para gravar no job [{job.job_id}].")
             if callback:
                 callback()
             return
@@ -335,31 +364,31 @@ class CameraCapture:
                     writer = None
 
         if writer is None:
-            logging.error(f"Erro crítico: Não foi possível instanciar VideoWriter para a câmera [{self.name}].")
+            logging.error(f"Erro crítico: Não foi possível instanciar VideoWriter para [{self.name}].")
             if callback:
                 callback()
             return
 
         try:
-            # 1. Escreve os frames antigos (passado)
+            # 1. Escreve os frames passados capturados no snapshot do buffer
             for frame in frames_snapshot:
                 if use_ffmpeg:
                     writer.stdin.write(frame.tobytes())
                 else:
                     writer.write(frame)
 
-            # 2. Escreve os novos frames (futuro) conforme chegam na fila
+            # 2. Escreve os novos frames (futuro) conforme chegam na fila do job
             while True:
-                frame = self.write_queue.get()
+                frame = job.queue.get()
                 if frame is None:  # Sinalizador de término da gravação
                     break
                 if use_ffmpeg:
                     writer.stdin.write(frame.tobytes())
                 else:
                     writer.write(frame)
-                self.write_queue.task_done()
+                job.queue.task_done()
         except Exception as e:
-            logging.error(f"Erro ao gravar frames no arquivo [{output_path}]: {e}")
+            logging.error(f"Erro ao gravar frames no job [{job.job_id}] [{output_path}]: {e}")
         finally:
             if use_ffmpeg:
                 try:
@@ -369,7 +398,7 @@ class CameraCapture:
                     logging.error(f"Erro ao finalizar processo FFmpeg: {e}")
             else:
                 writer.release()
-            logging.info(f"Gravação concluída para a câmera [{self.name}]: {output_path}")
+            logging.info(f"Gravação concluída com sucesso: {output_path}")
             
             # Dispara upload em segundo plano para o Supabase Storage + Banco de dados
             try:
@@ -388,67 +417,67 @@ class CameraCapture:
         """
         Gera um clipe de vídeo baseado nos frames já guardados no buffer (segundos passados)
         e continua a gravar os frames que entrarem nos próximos segundos (segundos futuros).
+        Suporta múltiplos disparos consecutivos sem bloqueios ou descartes!
         """
-        # Aumenta dinamicamente o tamanho do buffer circular na memória se o corte solicitado for maior que o configurado
         if seconds_before > self.buffer_seconds:
             self.update_buffer_size(seconds_before + 5)
 
-        with self.recording_lock:
-            if self.recording_active:
-                logging.warning(f"Gravação já ativa na câmera [{self.name}]. Ignorando trigger.")
-                return False
+        with self.buffer_lock:
+            buffer_snapshot = list(self.buffer)
 
-            with self.buffer_lock:
-                buffer_snapshot = list(self.buffer)
+        if not buffer_snapshot:
+            logging.error(f"Erro: Buffer da câmera [{self.name}] está vazio. Não foi possível gerar recorte.")
+            return False
 
-            if not buffer_snapshot:
-                logging.error(f"Erro: Buffer da câmera [{self.name}] está vazio. Não foi possível gerar recorte.")
-                return False
+        # Filtra os frames que correspondem aos segundos antes do disparo
+        now = time.time()
+        start_time_limit = now - seconds_before
+        
+        frames_to_write_tuples = [(ts, frame) for ts, frame in buffer_snapshot if ts >= start_time_limit]
 
-            # Filtra os frames que correspondem aos segundos antes do disparo
-            now = time.time()
-            start_time_limit = now - seconds_before
-            
-            # Recupera os frames e seus respectivos timestamps
-            frames_to_write_tuples = [(ts, frame) for ts, frame in buffer_snapshot if ts >= start_time_limit]
+        if not frames_to_write_tuples:
+            num_frames_needed = int(seconds_before * self.fps)
+            frames_to_write_tuples = list(buffer_snapshot)[-num_frames_needed:]
 
-            # Caso não haja frames suficientes baseados no tempo real (por lag de início), pega os N mais recentes do buffer
-            if not frames_to_write_tuples:
-                num_frames_needed = int(seconds_before * self.fps)
-                frames_to_write_tuples = list(buffer_snapshot)[-num_frames_needed:]
+        frames_to_write = [frame for ts, frame in frames_to_write_tuples]
 
-            frames_to_write = [frame for ts, frame in frames_to_write_tuples]
+        # Medição do FPS real
+        measured_fps = self.fps
+        if len(frames_to_write_tuples) > 1:
+            duration = frames_to_write_tuples[-1][0] - frames_to_write_tuples[0][0]
+            if duration > 0:
+                measured_fps = len(frames_to_write_tuples) / duration
+                if not (1.0 <= measured_fps <= 120.0):
+                    measured_fps = self.fps
+                else:
+                    measured_fps = round(measured_fps, 2)
 
-            # Medição do FPS real baseado na distância temporal dos frames capturados
-            measured_fps = self.fps
-            if len(frames_to_write_tuples) > 1:
-                duration = frames_to_write_tuples[-1][0] - frames_to_write_tuples[0][0]
-                if duration > 0:
-                    measured_fps = len(frames_to_write_tuples) / duration
-                    # Garante limites razoáveis de FPS
-                    if not (1.0 <= measured_fps <= 120.0):
-                        measured_fps = self.fps
-                    else:
-                        # Arredonda o FPS real medido para melhor compatibilidade com reprodutores de vídeo
-                        measured_fps = round(measured_fps, 2)
+        job_id = f"job_{int(now * 1000)}"
+        frames_needed = int(seconds_after * measured_fps)
 
-            # Inicializa a fila e os parâmetros de controle
-            self.write_queue = queue.Queue()
-            self.recording_frames_needed = int(seconds_after * measured_fps)
-            self.recording_frames_written = 0
-            self.recording_active = True
+        job = RecordingJob(
+            job_id=job_id,
+            output_path=output_path,
+            measured_fps=measured_fps,
+            frames_needed=frames_needed,
+            callback=callback
+        )
 
-            # Dispara a thread secundária para gravar em disco de forma assíncrona
-            self.writer_thread = threading.Thread(
-                target=self._write_worker,
-                args=(output_path, frames_to_write, measured_fps, callback),
-                name=f"WriteThread-{self.camera_id}",
-                daemon=True
-            )
-            self.writer_thread.start()
+        with self.jobs_lock:
+            self.active_jobs.append(job)
 
-            logging.info(f"Recorte disparado assincronamente na câmera [{self.name}] a {measured_fps} FPS reais. Gravando em background...")
-            return True
+        # Inicia a thread de escrita independente para este job
+        writer_thread = threading.Thread(
+            target=self._write_worker_job,
+            args=(job, frames_to_write),
+            name=f"WriteThread-{job_id}",
+            daemon=True
+        )
+        writer_thread.start()
+        job.thread = writer_thread
+
+        logging.info(f"Recorte disparado com sucesso na câmera [{self.name}] (Job: {job_id}, {measured_fps} FPS). Gravando em background...")
+        return True
 
     def get_preview_frame(self):
         """
@@ -595,7 +624,7 @@ class CameraManager:
             return None
 
         cam = self.cameras[cam_id]
-        clip_filename = f"{clip_name_prefix}_{cam_id}_{int(time.time())}.mp4"
+        clip_filename = f"{clip_name_prefix}_{cam_id}_{int(time.time() * 1000)}.mp4"
         output_path = os.path.join(self.clips_dir, clip_filename)
         
         # Adiciona um callback para registrar que o clipe foi gravado com sucesso

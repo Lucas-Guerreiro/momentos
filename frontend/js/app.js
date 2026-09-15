@@ -748,8 +748,18 @@ function handleGamepadButtonPress(gamepadIndex, buttonIndex) {
         triggerClip(binding.camera_id);
     }
 }
-// --- Trigger de Recorte ---
+
+// --- Trigger de Recorte Multi-Disparos ---
+let lastTriggerTimeByCam = {};
+
 async function triggerClip(cameraId) {
+    const now = Date.now();
+    // Debounce de 250ms apenas para evitar duplo acionamento por trepidação mecânica do botão arcade
+    if (lastTriggerTimeByCam[cameraId] && (now - lastTriggerTimeByCam[cameraId]) < 250) {
+        return;
+    }
+    lastTriggerTimeByCam[cameraId] = now;
+
     const secBefore = parseInt(configBefore.value) || 5;
     const secAfter = parseInt(configAfter.value) || 3;
     const totalDurationMs = (secBefore + secAfter) * 1000;
