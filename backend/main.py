@@ -378,7 +378,104 @@ async def delete_clip(clip_filename: str):
         "deleted_cloud": cloud_deleted
     }
 
-# Editar clipe (Corte, Crop 9:16/1:1, Pan e Otimização para Instagram)
+def create_text_overlay_image(width: int, height: int, text: Optional[str] = None, style: str = "black-pill", pos: str = "middle", output_path: Optional[str] = None) -> str:
+    """
+    Gera uma imagem PNG transparente com a marca d'água oficial e o badge de legenda
+    personalizado estilizado do atleta para queima direta via FFmpeg.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+    import tempfile
+
+    if not output_path:
+        fd, output_path = tempfile.mkstemp(suffix=".png", prefix="overlay_")
+        os.close(fd)
+
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    def get_font(size: int, bold: bool = True):
+        candidates = [
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf" if bold else "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+            "C:\\Windows\\Fonts\\arialbd.ttf" if bold else "C:\\Windows\\Fonts\\arial.ttf",
+            "C:\\Windows\\Fonts\\segoeui.ttf",
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                try:
+                    return ImageFont.truetype(c, size)
+                except Exception:
+                    pass
+        try:
+            return ImageFont.load_default()
+        except Exception:
+            return None
+
+    # 1. Marca d'água MOMENTOS no canto superior direito
+    wm_font = get_font(max(13, int(width * 0.024)), bold=True)
+    wm_text = "MOMENTOS"
+    try:
+        wm_bbox = draw.textbbox((0, 0), wm_text, font=wm_font) if wm_font else (0, 0, 80, 20)
+        wm_w = wm_bbox[2] - wm_bbox[0]
+        wm_h = wm_bbox[3] - wm_bbox[1]
+    except Exception:
+        wm_w, wm_h = 80, 20
+
+    wm_x = width - wm_w - 28
+    wm_y = 28
+    draw.rounded_rectangle([wm_x - 10, wm_y - 6, wm_x + wm_w + 10, wm_y + wm_h + 6], radius=6, fill=(0, 0, 0, 140))
+    draw.text((wm_x, wm_y - 2), wm_text, fill=(255, 255, 255, 230), font=wm_font)
+
+    # 2. Legenda / Frase personalizada
+    if text and text.strip():
+        text_clean = text.strip()
+        font_size = max(22, int(width * 0.052))
+        font = get_font(font_size, bold=True)
+
+        if pos == "top":
+            cy = int(height * 0.20)
+        elif pos == "bottom":
+            cy = int(height * 0.78)
+        else: # middle
+            cy = int(height * 0.48)
+
+        try:
+            t_bbox = draw.textbbox((0, 0), text_clean, font=font) if font else (0, 0, len(text_clean) * 15, 30)
+            tw = t_bbox[2] - t_bbox[0]
+            th = t_bbox[3] - t_bbox[1]
+        except Exception:
+            tw = len(text_clean) * 15
+            th = 30
+
+        cx = width // 2
+        pad_x = 24
+        pad_y = 14
+        box_w = min(width - 40, tw + (pad_x * 2))
+        box_h = th + (pad_y * 2)
+        box_x0 = max(10, cx - (box_w // 2))
+        box_y0 = cy - (box_h // 2)
+        box_x1 = min(width - 10, box_x0 + box_w)
+        box_y1 = box_y0 + box_h
+
+        if style == "black-pill":
+            draw.rounded_rectangle([box_x0, box_y0, box_x1, box_y1], radius=14, fill=(0, 0, 0, 220), outline=(255, 255, 255, 75), width=2)
+            draw.text((cx - tw // 2, cy - th // 2 - 2), text_clean, fill=(255, 255, 255, 255), font=font)
+        elif style == "gold-pill":
+            draw.rounded_rectangle([box_x0, box_y0, box_x1, box_y1], radius=14, fill=(245, 158, 11, 240))
+            draw.text((cx - tw // 2, cy - th // 2 - 2), text_clean, fill=(0, 0, 0, 255), font=font)
+        elif style == "cyan-pill":
+            draw.rounded_rectangle([box_x0, box_y0, box_x1, box_y1], radius=14, fill=(6, 182, 212, 240))
+            draw.text((cx - tw // 2, cy - th // 2 - 2), text_clean, fill=(255, 255, 255, 255), font=font)
+        else: # clean-text
+            for dx, dy in [(-2, 0), (2, 0), (0, -2), (0, 2), (2, 2), (-2, -2), (2, -2), (-2, 2)]:
+                draw.text((cx - tw // 2 + dx, cy - th // 2 + dy - 2), text_clean, fill=(0, 0, 0, 240), font=font)
+            draw.text((cx - tw // 2, cy - th // 2 - 2), text_clean, fill=(255, 255, 255, 255), font=font)
+
+    img.save(output_path, "PNG")
+    return output_path
+
+# Editar clipe (Corte, Crop 9:16/1:1, Pan, Queima de Texto e Otimização para Instagram)
 @app.post("/api/clips/edit")
 async def edit_clip(req: EditClipRequest):
     import subprocess
@@ -402,30 +499,46 @@ async def edit_clip(req: EditClipRequest):
     duration = max(0.5, req.end_time - start_sec)
     pan_ratio = max(0.0, min(1.0, req.pan_pct / 100.0))
 
-    # Constrói filtros de vídeo FFmpeg para crop e escala
-    vf_filters = []
+    target_w, target_h = 720, 1280
     if req.aspect_ratio == "9-16":
-        vf_filters.append(f"crop=w=ih*9/16:h=ih:x=(iw-ow)*{pan_ratio}:y=0,scale=720:1280:flags=lanczos")
+        target_w, target_h = 720, 1280
+        scale_crop_filter = f"crop=w=ih*9/16:h=ih:x=(iw-ow)*{pan_ratio}:y=0,scale=720:1280:flags=lanczos"
     elif req.aspect_ratio == "1-1":
-        vf_filters.append(f"crop=w=ih:h=ih:x=(iw-ow)*{pan_ratio}:y=0,scale=720:720:flags=lanczos")
+        target_w, target_h = 720, 720
+        scale_crop_filter = f"crop=w=ih:h=ih:x=(iw-ow)*{pan_ratio}:y=0,scale=720:720:flags=lanczos"
     else:
-        vf_filters.append("scale=1280:720:flags=lanczos")
+        target_w, target_h = 1280, 720
+        scale_crop_filter = "scale=1280:720:flags=lanczos"
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-ss", str(start_sec),
-        "-t", str(duration),
-        "-i", input_path,
-        "-vf", ",".join(vf_filters),
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "22",
-        "-c:a", "aac",
-        "-movflags", "+faststart",
-        output_path
-    ]
-
+    overlay_path = None
     try:
+        overlay_path = create_text_overlay_image(
+            width=target_w,
+            height=target_h,
+            text=req.text,
+            style=req.text_style or "black-pill",
+            pos=req.text_pos or "middle"
+        )
+
+        filter_complex = f"[0:v]{scale_crop_filter}[v0];[v0][1:v]overlay=0:0[outv]"
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", str(start_sec),
+            "-t", str(duration),
+            "-i", input_path,
+            "-i", overlay_path,
+            "-filter_complex", filter_complex,
+            "-map", "[outv]",
+            "-map", "0:a?",
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "22",
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            output_path
+        ]
+
         res = await asyncio.to_thread(subprocess.run, cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if res.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
             return FileResponse(
@@ -439,6 +552,12 @@ async def edit_clip(req: EditClipRequest):
     except Exception as e:
         logger.error(f"Erro ao editar clipe: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if overlay_path and os.path.exists(overlay_path):
+            try:
+                os.remove(overlay_path)
+            except Exception:
+                pass
 
 # --- Controles / Mapeamento de Botões Arcade ---
 @app.get("/api/config/controls")

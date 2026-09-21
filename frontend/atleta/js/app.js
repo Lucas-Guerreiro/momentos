@@ -961,12 +961,18 @@ const renderProgressFill = document.getElementById('render-progress-fill');
 function toggleStudioPlayPause() {
     if (!studioPreviewVideo) return;
     if (studioPreviewVideo.paused) {
-        studioPreviewVideo.play().then(() => {
-            updateStudioPlayState(true);
-        }).catch(err => {
-            console.warn("Play bloqueado:", err);
-            updateStudioPlayState(false);
-        });
+        if (studioDuration > 0 && studioPreviewVideo.currentTime >= studioTrimEnd - 0.1) {
+            studioPreviewVideo.currentTime = studioTrimStart;
+        }
+        const playProm = studioPreviewVideo.play();
+        if (playProm !== undefined) {
+            playProm.then(() => {
+                updateStudioPlayState(true);
+            }).catch(err => {
+                console.warn("Play bloqueado:", err);
+                updateStudioPlayState(false);
+            });
+        }
     } else {
         studioPreviewVideo.pause();
         updateStudioPlayState(false);
@@ -976,7 +982,10 @@ function toggleStudioPlayPause() {
 function updateStudioPlayState(isPlaying) {
     if (isPlaying) {
         if (studioPlayIndicator) studioPlayIndicator.classList.add('playing');
-        if (studioPosterFallback) studioPosterFallback.style.opacity = '0';
+        if (studioPosterFallback) {
+            studioPosterFallback.style.opacity = '0';
+            studioPosterFallback.style.display = 'none';
+        }
         if (icoBtnPlay) icoBtnPlay.style.display = 'none';
         if (icoBtnPause) icoBtnPause.style.display = 'block';
         if (labelTrimPlay) labelTrimPlay.textContent = 'Pausar';
@@ -1011,7 +1020,10 @@ function setupStudioEventListeners() {
     studioPreviewVideo.addEventListener('play', () => updateStudioPlayState(true));
     studioPreviewVideo.addEventListener('pause', () => updateStudioPlayState(false));
     studioPreviewVideo.addEventListener('playing', () => {
-        if (studioPosterFallback) studioPosterFallback.style.display = 'none';
+        if (studioPosterFallback) {
+            studioPosterFallback.style.opacity = '0';
+            studioPosterFallback.style.display = 'none';
+        }
         updateStudioPlayState(true);
     });
 
@@ -1035,7 +1047,7 @@ function setupStudioEventListeners() {
             val = studioTrimEnd - 0.5;
             e.target.value = val;
         }
-        studioTrimStart = val;
+        studioTrimStart = Math.max(0, val);
         trimStartLabel.textContent = `${studioTrimStart.toFixed(1)}s`;
         trimDurLabel.textContent = `${(studioTrimEnd - studioTrimStart).toFixed(1)}s`;
         studioPreviewVideo.currentTime = studioTrimStart;
@@ -1047,15 +1059,17 @@ function setupStudioEventListeners() {
             val = studioTrimStart + 0.5;
             e.target.value = val;
         }
-        studioTrimEnd = val;
+        studioTrimEnd = Math.min(studioDuration || 10, val);
         trimEndLabel.textContent = `${studioTrimEnd.toFixed(1)}s`;
         trimDurLabel.textContent = `${(studioTrimEnd - studioTrimStart).toFixed(1)}s`;
     });
 
     // Loop do Vídeo do Estúdio dentro do trecho cortado
     studioPreviewVideo.addEventListener('timeupdate', () => {
-        if (studioPreviewVideo.currentTime >= studioTrimEnd || studioPreviewVideo.currentTime < studioTrimStart - 0.1) {
-            studioPreviewVideo.currentTime = studioTrimStart;
+        if (studioDuration > 0 && studioTrimEnd > studioTrimStart + 0.2) {
+            if (studioPreviewVideo.currentTime >= studioTrimEnd - 0.05) {
+                studioPreviewVideo.currentTime = studioTrimStart;
+            }
         }
     });
 
@@ -1212,7 +1226,7 @@ function openVideoStudio(filename, event) {
     }
 
     studioClipTag.textContent = studioClip.camera_name || extractCameraLabel(studioClip.filename);
-    const videoSrc = studioClip.video_url || studioClip.preview_url || `${API_BASE}/api/clips/${studioClip.filename}`;
+    const videoSrc = studioClip.preview_url || studioClip.video_url || `${API_BASE}/api/clips/${studioClip.filename}`;
 
     // Mostra o poster imediatamente para garantir que a imagem apareça sem tela preta
     if (studioPosterFallback) {
@@ -1224,12 +1238,63 @@ function openVideoStudio(filename, event) {
         };
     }
 
+    // Inicializa variáveis de trim antes de qualquer evento
+    studioDuration = 0;
+    studioTrimStart = 0;
+    studioTrimEnd = 9999;
+
+    resetStudioDefaults();
+
     studioPreviewVideo.poster = studioClip.thumb_url;
     studioPreviewVideo.muted = true;
     studioPreviewVideo.playsInline = true;
     studioPreviewVideo.setAttribute('playsinline', '');
     studioPreviewVideo.setAttribute('webkit-playsinline', '');
+    studioPreviewVideo.crossOrigin = 'anonymous';
     studioPreviewVideo.src = videoSrc;
+
+    const setupMetadata = () => {
+        studioDuration = studioPreviewVideo.duration || 10;
+        studioTrimStart = 0;
+        studioTrimEnd = studioDuration;
+
+        trimStartRange.min = 0;
+        trimStartRange.max = studioDuration;
+        trimStartRange.step = 0.1;
+        trimStartRange.value = 0;
+
+        trimEndRange.min = 0;
+        trimEndRange.max = studioDuration;
+        trimEndRange.step = 0.1;
+        trimEndRange.value = studioDuration;
+
+        trimStartLabel.textContent = "0.0s";
+        trimEndLabel.textContent = `${studioDuration.toFixed(1)}s`;
+        trimDurLabel.textContent = `${studioDuration.toFixed(1)}s`;
+
+        studioPreviewVideo.currentTime = 0;
+        const playProm = studioPreviewVideo.play();
+        if (playProm !== undefined) {
+            playProm.then(() => {
+                updateStudioPlayState(true);
+            }).catch(err => {
+                console.log("Autoplay preview notice:", err);
+                updateStudioPlayState(false);
+            });
+        }
+    };
+
+    studioPreviewVideo.onloadedmetadata = setupMetadata;
+    if (studioPreviewVideo.readyState >= 1) {
+        setupMetadata();
+    }
+
+    studioPreviewVideo.onloadeddata = () => {
+        if (studioPosterFallback) {
+            studioPosterFallback.style.opacity = '0';
+            studioPosterFallback.style.display = 'none';
+        }
+    };
 
     studioPreviewVideo.onerror = () => {
         console.warn("Aviso ao carregar vídeo no editor, tentando fallback local:", studioClip.filename);
@@ -1240,34 +1305,6 @@ function openVideoStudio(filename, event) {
         }
     };
 
-    const handleLoadedMetadata = () => {
-        studioDuration = studioPreviewVideo.duration || 10;
-        studioTrimStart = 0;
-        studioTrimEnd = studioDuration;
-
-        trimStartRange.max = studioDuration;
-        trimStartRange.value = 0;
-        trimEndRange.max = studioDuration;
-        trimEndRange.value = studioDuration;
-
-        trimStartLabel.textContent = "0.0s";
-        trimEndLabel.textContent = `${studioDuration.toFixed(1)}s`;
-        trimDurLabel.textContent = `${studioDuration.toFixed(1)}s`;
-
-        studioPreviewVideo.currentTime = 0;
-        studioPreviewVideo.play().then(() => {
-            updateStudioPlayState(true);
-        }).catch(() => {
-            updateStudioPlayState(false);
-        });
-    };
-
-    studioPreviewVideo.onloadedmetadata = handleLoadedMetadata;
-    studioPreviewVideo.onloadeddata = () => {
-        if (studioPosterFallback) studioPosterFallback.style.opacity = '0';
-    };
-
-    resetStudioDefaults();
     studioModalBackdrop.style.display = 'flex';
     studioPreviewVideo.load();
 }
@@ -1300,9 +1337,9 @@ function resetStudioDefaults() {
     stylePills.forEach(b => b.classList.toggle('active', b.getAttribute('data-style') === 'black-pill'));
     posButtons.forEach(b => b.classList.toggle('active', b.getAttribute('data-pos') === 'middle'));
 
-    if (studioPreviewVideo.duration) {
+    if (studioDuration > 0) {
         studioTrimStart = 0;
-        studioTrimEnd = studioPreviewVideo.duration;
+        studioTrimEnd = studioDuration;
         trimStartRange.value = 0;
         trimEndRange.value = studioDuration;
         trimStartLabel.textContent = "0.0s";
