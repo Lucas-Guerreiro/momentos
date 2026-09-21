@@ -228,3 +228,49 @@ def upload_clip_async(file_path: str, camera_name: str = "Câmera Principal"):
     """
     t = threading.Thread(target=upload_clip_worker, args=(file_path, camera_name), daemon=True)
     t.start()
+
+def delete_clip_from_r2(filename: str) -> bool:
+    """
+    Deleta todos os arquivos associados ao clipe no Cloudflare R2 (original, preview e thumb).
+    """
+    try:
+        s3 = get_s3_client()
+        keys_to_delete = [
+            {"Key": filename},
+            {"Key": f"previews/{filename}"},
+            {"Key": f"thumbs/{filename}.jpg"},
+            {"Key": f"thumbs/{filename}"}
+        ]
+        s3.delete_objects(
+            Bucket=R2_BUCKET_NAME,
+            Delete={"Objects": keys_to_delete, "Quiet": True}
+        )
+        logger.info(f"Objetos do clipe {filename} removidos do Cloudflare R2.")
+        return True
+    except Exception as e:
+        logger.warning(f"Aviso ao deletar objetos do R2 ({filename}): {e}")
+        return False
+
+def delete_lance_record(filename: str) -> bool:
+    """
+    Remove o registro do lance da tabela 'lances' no Supabase via REST API.
+    """
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/lances?filename=eq.{urllib.parse.quote(filename)}"
+        headers = get_supabase_headers()
+        req = urllib.request.Request(url, headers=headers, method="DELETE")
+        with urllib.request.urlopen(req) as resp:
+            if resp.status in (200, 204):
+                logger.info(f"Registro do lance {filename} removido do Supabase.")
+                return True
+    except Exception as e:
+        logger.warning(f"Aviso ao deletar registro do Supabase ({filename}): {e}")
+    return False
+
+def delete_clip_cloud(filename: str) -> bool:
+    """
+    Remove o clipe da nuvem (Cloudflare R2 e Supabase).
+    """
+    r2_ok = delete_clip_from_r2(filename)
+    db_ok = delete_lance_record(filename)
+    return r2_ok or db_ok

@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCameras();
     loadBindings();
     loadClips();
+    setupAdminRealtimeSubscription();
     setupGamepadLoop();
     setupKeyboardListeners();
     setupPlayerEventListeners();
@@ -1012,6 +1013,48 @@ async function loadClips() {
     renderClips();
 }
 
+// --- Subscrição em Tempo Real para o Painel Administrativo ---
+function setupAdminRealtimeSubscription() {
+    if (!supabaseClient) return;
+    try {
+        supabaseClient
+            .channel('admin_gallery_feed')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lances' }, (payload) => {
+                const lance = payload.new;
+                if (!lance) return;
+                const ts = new Date(lance.created_at).getTime() / 1000;
+                const videoUrl = lance.video_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/${lance.filename}`;
+                const previewUrl = lance.preview_url || videoUrl.replace('pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/', 'pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/previews/');
+
+                const newClip = {
+                    filename: lance.filename,
+                    video_url: videoUrl,
+                    preview_url: previewUrl,
+                    thumb_url: lance.thumb_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/thumbs/${lance.filename}.jpg`,
+                    size_bytes: lance.size_bytes || 0,
+                    created_at: isNaN(ts) ? Date.now() / 1000 : ts
+                };
+
+                if (!clips.some(c => c.filename === newClip.filename)) {
+                    clips.unshift(newClip);
+                    renderClips();
+                }
+            })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'lances' }, (payload) => {
+                const deletedFilename = payload.old ? payload.old.filename : null;
+                if (deletedFilename) {
+                    clips = clips.filter(c => c.filename !== deletedFilename);
+                    renderClips();
+                } else {
+                    loadClips();
+                }
+            })
+            .subscribe();
+    } catch (e) {
+        console.warn("Aviso ao inicializar Realtime no admin:", e);
+    }
+}
+
 function getDayKey(timestampSec) {
     const d = new Date(timestampSec * 1000);
     const year = d.getFullYear();
@@ -1375,20 +1418,45 @@ function setupPlayerEventListeners() {
         if (!activeClipFilename) return;
         if (!confirm("Tem certeza que deseja excluir este clipe permanentemente?")) return;
 
+        const filenameToDelete = activeClipFilename;
+        let deletedSuccessfully = false;
+
+        // 1. Tenta deletar através da API do Backend local (que remove local + R2 + Supabase)
         try {
-            const response = await fetch(`${API_BASE}/api/clips/${activeClipFilename}`, {
+            const response = await fetch(`${API_BASE}/api/clips/${filenameToDelete}`, {
                 method: 'DELETE'
             });
 
             if (response.ok) {
-                showToast("Clipe deletado com sucesso!");
-                closePlayer();
-                loadClips();
-            } else {
-                showToast("Erro ao deletar o clipe.", true);
+                deletedSuccessfully = true;
             }
         } catch (error) {
-            showToast("Erro ao comunicar com o servidor.", true);
+            console.warn("Backend local indisponível para exclusão, tentando Supabase direto...", error);
+        }
+
+        // 2. Se o backend local não deletou (ex: deploy web/Vercel ou arquivo já fora do disco), deleta direto no Supabase
+        if (!deletedSuccessfully && supabaseClient) {
+            try {
+                const { error } = await supabaseClient
+                    .from('lances')
+                    .delete()
+                    .eq('filename', filenameToDelete);
+
+                if (!error) {
+                    deletedSuccessfully = true;
+                }
+            } catch (err) {
+                console.error("Erro ao deletar diretamente no Supabase:", err);
+            }
+        }
+
+        if (deletedSuccessfully) {
+            showToast("Clipe deletado com sucesso!");
+            clips = clips.filter(c => c.filename !== filenameToDelete);
+            closePlayer();
+            renderClips();
+        } else {
+            showToast("Erro ao deletar o clipe.", true);
         }
     });
 }

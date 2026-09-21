@@ -165,6 +165,15 @@ function setupRealtimeSubscription() {
                 showToast("Novo lance gravado na quadra!");
                 renderStoriesBar();
             })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'lances' }, (payload) => {
+                const deletedFilename = payload.old ? payload.old.filename : null;
+                if (deletedFilename) {
+                    allClips = allClips.filter(c => c.filename !== deletedFilename);
+                    applyFiltersAndRender();
+                } else {
+                    loadClips(false);
+                }
+            })
             .subscribe();
     } catch (e) {
         console.warn("Fallback para polling:", e);

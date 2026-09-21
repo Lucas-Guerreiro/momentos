@@ -338,17 +338,40 @@ async def get_clip_thumbnail(clip_filename: str):
         headers={"Cache-Control": "public, max-age=604800"}
     )
 
-# Excluir clipe
+# Excluir clipe (Local + Cloudflare R2 + Supabase)
 @app.delete("/api/clips/{clip_filename}")
 async def delete_clip(clip_filename: str):
+    local_deleted = False
+    
+    # 1. Deleta arquivos locais (vídeo, miniatura, preview) se existirem
     path = os.path.join(CLIPS_DIR, clip_filename)
-    if os.path.exists(path):
-        try:
-            os.remove(path)
-            return {"status": "success"}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Erro ao deletar arquivo: {str(e)}")
-    raise HTTPException(status_code=404, detail="Clipe não encontrado")
+    thumb_path = os.path.join(CLIPS_DIR, ".thumbs", f"{clip_filename}.jpg")
+    preview_path = os.path.join(CLIPS_DIR, ".previews", f"prev_{clip_filename}")
+
+    for p in [path, thumb_path, preview_path]:
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+                local_deleted = True
+                logger.info(f"Arquivo local removido: {p}")
+            except Exception as e:
+                logger.warning(f"Erro ao remover arquivo local {p}: {e}")
+
+    # 2. Deleta arquivos no Cloudflare R2 e registro no Supabase
+    cloud_deleted = False
+    try:
+        from cloud_sync import delete_clip_cloud
+        cloud_deleted = await asyncio.to_thread(delete_clip_cloud, clip_filename)
+    except Exception as e:
+        logger.warning(f"Erro ao processar exclusão na nuvem para {clip_filename}: {e}")
+
+    # Retorna sucesso se foi deletado localmente, na nuvem, ou simplesmente confirmado
+    return {
+        "status": "success",
+        "filename": clip_filename,
+        "deleted_local": local_deleted,
+        "deleted_cloud": cloud_deleted
+    }
 
 # --- Controles / Mapeamento de Botões Arcade ---
 @app.get("/api/config/controls")
