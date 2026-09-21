@@ -84,8 +84,8 @@ async function loadClips(isInitial = false) {
                 allClips = data.map(lance => {
                     const ts = new Date(lance.created_at).getTime() / 1000;
                     const videoUrl = lance.video_url || `${R2_PUBLIC_URL}/${lance.filename}`;
-                    const previewUrl = lance.preview_url || videoUrl.replace('pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/', 'pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/previews/');
-                    const thumbUrl = lance.thumb_url || `${R2_PUBLIC_URL}/thumbs/${lance.filename}.jpg`;
+                    const previewUrl = lance.preview_url || videoUrl;
+                    const thumbUrl = lance.thumb_url || `${API_BASE}/api/clips/${lance.filename}/thumb`;
 
                     return {
                         filename: lance.filename,
@@ -147,8 +147,8 @@ function setupRealtimeSubscription() {
                 const lance = payload.new;
                 const ts = new Date(lance.created_at).getTime() / 1000;
                 const videoUrl = lance.video_url || `${R2_PUBLIC_URL}/${lance.filename}`;
-                const previewUrl = lance.preview_url || videoUrl.replace('pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/', 'pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/previews/');
-                const thumbUrl = lance.thumb_url || `${R2_PUBLIC_URL}/thumbs/${lance.filename}.jpg`;
+                const previewUrl = lance.preview_url || videoUrl;
+                const thumbUrl = lance.thumb_url || `${API_BASE}/api/clips/${lance.filename}/thumb`;
 
                 const newClip = {
                     filename: lance.filename,
@@ -1212,22 +1212,35 @@ function openVideoStudio(filename, event) {
     }
 
     studioClipTag.textContent = studioClip.camera_name || extractCameraLabel(studioClip.filename);
-    const videoSrc = studioClip.preview_url || studioClip.video_url;
+    const videoSrc = studioClip.video_url || studioClip.preview_url || `${API_BASE}/api/clips/${studioClip.filename}`;
 
     // Mostra o poster imediatamente para garantir que a imagem apareça sem tela preta
     if (studioPosterFallback) {
         studioPosterFallback.src = studioClip.thumb_url;
         studioPosterFallback.style.display = 'block';
         studioPosterFallback.style.opacity = '1';
+        studioPosterFallback.onerror = () => {
+            studioPosterFallback.src = `${API_BASE}/api/clips/${studioClip.filename}/thumb`;
+        };
     }
 
     studioPreviewVideo.poster = studioClip.thumb_url;
     studioPreviewVideo.muted = true;
     studioPreviewVideo.playsInline = true;
-    studioPreviewVideo.src = `${videoSrc}#t=0.001`;
-    studioPreviewVideo.load();
+    studioPreviewVideo.setAttribute('playsinline', '');
+    studioPreviewVideo.setAttribute('webkit-playsinline', '');
+    studioPreviewVideo.src = videoSrc;
 
-    studioPreviewVideo.onloadedmetadata = () => {
+    studioPreviewVideo.onerror = () => {
+        console.warn("Aviso ao carregar vídeo no editor, tentando fallback local:", studioClip.filename);
+        if (!studioPreviewVideo.src.includes('/api/clips/')) {
+            studioPreviewVideo.src = `${API_BASE}/api/clips/${studioClip.filename}`;
+            studioPreviewVideo.load();
+            studioPreviewVideo.play().catch(() => {});
+        }
+    };
+
+    const handleLoadedMetadata = () => {
         studioDuration = studioPreviewVideo.duration || 10;
         studioTrimStart = 0;
         studioTrimEnd = studioDuration;
@@ -1249,8 +1262,14 @@ function openVideoStudio(filename, event) {
         });
     };
 
+    studioPreviewVideo.onloadedmetadata = handleLoadedMetadata;
+    studioPreviewVideo.onloadeddata = () => {
+        if (studioPosterFallback) studioPosterFallback.style.opacity = '0';
+    };
+
     resetStudioDefaults();
     studioModalBackdrop.style.display = 'flex';
+    studioPreviewVideo.load();
 }
 
 function closeVideoStudio() {

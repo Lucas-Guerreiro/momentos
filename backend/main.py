@@ -4,7 +4,7 @@ import logging
 import asyncio
 from typing import Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
-from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -299,54 +299,49 @@ async def get_clips():
     clips.sort(key=lambda x: x["created_at"], reverse=True)
     return clips
 
-# Servir clipe de vídeo (suporta Range HTTP automaticamente)
+# Servir clipe de vídeo (suporta Range HTTP localmente ou redireciona para R2)
 @app.get("/api/clips/{clip_filename}")
 async def serve_clip(clip_filename: str):
     path = os.path.join(CLIPS_DIR, clip_filename)
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Clipe não encontrado")
-    return FileResponse(path, media_type="video/mp4")
+    if os.path.exists(path):
+        return FileResponse(path, media_type="video/mp4")
+    from cloud_sync import R2_PUBLIC_URL
+    return RedirectResponse(url=f"{R2_PUBLIC_URL}/{clip_filename}", status_code=307)
 
-# Servir miniatura ultra leve do vídeo (JPEG 10KB) com cache
+# Servir miniatura do vídeo com geração local ou fallback no R2
 @app.get("/api/clips/{clip_filename}/thumb")
 async def get_clip_thumbnail(clip_filename: str):
-    video_path = os.path.join(CLIPS_DIR, clip_filename)
-    if not os.path.exists(video_path):
-        raise HTTPException(status_code=404, detail="Clipe não encontrado")
-        
     thumbs_dir = os.path.join(CLIPS_DIR, ".thumbs")
     os.makedirs(thumbs_dir, exist_ok=True)
     thumb_path = os.path.join(thumbs_dir, f"{clip_filename}.jpg")
     
-    if not os.path.exists(thumb_path):
-        import cv2
-        cap = cv2.VideoCapture(video_path)
-        # Pula para frame 10 para evitar eventuais telas pretas iniciais
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 10)
-        ret, frame = cap.read()
-        if not ret:
-            # Fallback para frame 0 se o vídeo for muito curto
-            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
+        return FileResponse(thumb_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=604800"})
+
+    video_path = os.path.join(CLIPS_DIR, clip_filename)
+    if os.path.exists(video_path):
+        try:
+            import cv2
+            cap = cv2.VideoCapture(video_path)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 10)
             ret, frame = cap.read()
-        cap.release()
-        
-        if ret and frame is not None:
-            h, w = frame.shape[:2]
-            target_w = 360
-            target_h = int(target_w * h / w) if w > 0 else 202
-            resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
-            cv2.imwrite(thumb_path, resized, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        else:
-            # Se não conseguiu ler o frame, gera uma miniatura escura padrão com gradiente
-            import numpy as np
-            blank = np.zeros((202, 360, 3), dtype=np.uint8)
-            cv2.imwrite(thumb_path, blank)
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+            cap.release()
             
-    return FileResponse(
-        thumb_path, 
-        media_type="image/jpeg", 
-        headers={"Cache-Control": "public, max-age=604800"}
-    )
+            if ret and frame is not None:
+                h, w = frame.shape[:2]
+                target_w = 480
+                target_h = int(target_w * h / w) if w > 0 else 270
+                resized = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
+                cv2.imwrite(thumb_path, resized, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                return FileResponse(thumb_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=604800"})
+        except Exception as e:
+            logger.warning(f"Aviso ao gerar miniatura local: {e}")
+
+    from cloud_sync import R2_PUBLIC_URL
+    return RedirectResponse(url=f"{R2_PUBLIC_URL}/thumbs/{clip_filename}.jpg", status_code=307)
 
 # Excluir clipe (Local + Cloudflare R2 + Supabase)
 @app.delete("/api/clips/{clip_filename}")

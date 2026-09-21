@@ -974,13 +974,14 @@ async function loadClips() {
                 clips = data.map(lance => {
                     const ts = new Date(lance.created_at).getTime() / 1000;
                     const videoUrl = lance.video_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/${lance.filename}`;
-                    const previewUrl = lance.preview_url || videoUrl.replace('pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/', 'pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/previews/');
+                    const previewUrl = lance.preview_url || videoUrl;
+                    const thumbUrl = lance.thumb_url || `${API_BASE}/api/clips/${lance.filename}/thumb`;
 
                     return {
                         filename: lance.filename,
                         video_url: videoUrl,
                         preview_url: previewUrl,
-                        thumb_url: lance.thumb_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/thumbs/${lance.filename}.jpg`,
+                        thumb_url: thumbUrl,
                         size_bytes: lance.size_bytes || 0,
                         created_at: isNaN(ts) ? Date.now() / 1000 : ts
                     };
@@ -1024,13 +1025,14 @@ function setupAdminRealtimeSubscription() {
                 if (!lance) return;
                 const ts = new Date(lance.created_at).getTime() / 1000;
                 const videoUrl = lance.video_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/${lance.filename}`;
-                const previewUrl = lance.preview_url || videoUrl.replace('pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/', 'pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/previews/');
+                const previewUrl = lance.preview_url || videoUrl;
+                const thumbUrl = lance.thumb_url || `${API_BASE}/api/clips/${lance.filename}/thumb`;
 
                 const newClip = {
                     filename: lance.filename,
                     video_url: videoUrl,
                     preview_url: previewUrl,
-                    thumb_url: lance.thumb_url || `https://pub-bf1a3aa70cd049a8ad4774397028451d.r2.dev/thumbs/${lance.filename}.jpg`,
+                    thumb_url: thumbUrl,
                     size_bytes: lance.size_bytes || 0,
                     created_at: isNaN(ts) ? Date.now() / 1000 : ts
                 };
