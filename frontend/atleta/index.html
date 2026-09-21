@@ -109,6 +109,188 @@
             </div>
         </div>
 
+        <!-- Modal do Estúdio de Edição do Atleta (Trim, Crop 9:16, Texto e Instagram) -->
+        <div class="studio-modal-backdrop" id="studio-modal-backdrop" style="display: none;">
+            <div class="studio-modal">
+                <!-- Topo do Estúdio -->
+                <div class="studio-header">
+                    <button class="studio-header-btn" id="btn-close-studio" title="Voltar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                    <div class="studio-title-box">
+                        <h3>✂️ Estúdio do Atleta</h3>
+                        <span id="studio-clip-tag">Câmera Principal</span>
+                    </div>
+                    <button class="studio-header-btn btn-studio-reset" id="btn-studio-reset" title="Restaurar Padrão">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Área Central de Pré-visualização com Crop Dinâmico -->
+                <div class="studio-preview-viewport">
+                    <div class="studio-crop-container ratio-9-16" id="studio-crop-container">
+                        <div class="studio-video-wrapper" id="studio-video-wrapper">
+                            <video id="studio-preview-video" playsinline webkit-playsinline loop muted></video>
+                        </div>
+                        
+                        <!-- Texto Overlay Arrastável no Vídeo -->
+                        <div class="studio-text-overlay" id="studio-text-overlay" style="display: none;">
+                            <span class="studio-text-content" id="studio-text-content"></span>
+                        </div>
+
+                        <!-- Marca D'água Opcional -->
+                        <div class="studio-watermark-tag">⚡ MOMENTOS</div>
+                    </div>
+                </div>
+
+                <!-- Barra de Abas de Ferramentas -->
+                <div class="studio-tools-tabs">
+                    <button class="studio-tab-btn active" data-tab="trim">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="6" cy="6" r="3"></circle>
+                            <circle cx="6" cy="18" r="3"></circle>
+                            <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+                            <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+                            <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+                        </svg>
+                        <span>Cortar</span>
+                    </button>
+                    <button class="studio-tab-btn" data-tab="crop">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 2v14a2 2 0 0 0 2 2h14"></path>
+                            <path d="M18 22V8a2 2 0 0 0-2-2H2"></path>
+                        </svg>
+                        <span>Formato</span>
+                    </button>
+                    <button class="studio-tab-btn" data-tab="text">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                            <line x1="9" y1="20" x2="15" y2="20"></line>
+                            <line x1="12" y1="4" x2="12" y2="20"></line>
+                        </svg>
+                        <span>Texto</span>
+                    </button>
+                </div>
+
+                <!-- Painéis de Ferramentas -->
+                <div class="studio-panels-container">
+                    <!-- PAINEL 1: CORTE DE TEMPO (TRIM) -->
+                    <div class="studio-panel active" id="panel-trim">
+                        <div class="trim-time-row">
+                            <div class="time-badge">Início: <strong id="trim-start-label">0.0s</strong></div>
+                            <div class="time-badge highlight">Duração: <strong id="trim-dur-label">0.0s</strong></div>
+                            <div class="time-badge">Fim: <strong id="trim-end-label">0.0s</strong></div>
+                        </div>
+
+                        <!-- Sliders de Início e Fim -->
+                        <div class="trim-slider-wrap">
+                            <label>Ponto Inicial (Início do Lance)</label>
+                            <input type="range" id="trim-start-range" min="0" max="10" step="0.1" value="0">
+                        </div>
+                        <div class="trim-slider-wrap">
+                            <label>Ponto Final (Fim da Jogada)</label>
+                            <input type="range" id="trim-end-range" min="0" max="10" step="0.1" value="10">
+                        </div>
+                    </div>
+
+                    <!-- PAINEL 2: FORMATO & ENQUADRAMENTO (CROP) -->
+                    <div class="studio-panel" id="panel-crop">
+                        <div class="ratio-options-row">
+                            <button class="ratio-btn active" data-ratio="9-16">
+                                <span class="ratio-icon">📱</span>
+                                <span class="ratio-label">9:16</span>
+                                <span class="ratio-sub">Reels / Stories</span>
+                            </button>
+                            <button class="ratio-btn" data-ratio="1-1">
+                                <span class="ratio-icon">⬛</span>
+                                <span class="ratio-label">1:1</span>
+                                <span class="ratio-sub">Quadrado Feed</span>
+                            </button>
+                            <button class="ratio-btn" data-ratio="16-9">
+                                <span class="ratio-icon">🖥️</span>
+                                <span class="ratio-label">16:9</span>
+                                <span class="ratio-sub">Original Wide</span>
+                            </button>
+                        </div>
+
+                        <div class="pan-slider-wrap" id="pan-slider-wrap">
+                            <div class="pan-header">
+                                <span>🎯 Posição do Enquadramento (Pan)</span>
+                                <span id="pan-pct-label">Centro (50%)</span>
+                            </div>
+                            <input type="range" id="pan-x-range" min="0" max="100" step="1" value="50">
+                            <div class="pan-hints">
+                                <span>⬅️ Esquerda</span>
+                                <span>Centro</span>
+                                <span>Direita ➡️</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PAINEL 3: TEXTO / LEGENDA -->
+                    <div class="studio-panel" id="panel-text">
+                        <div class="text-input-wrap">
+                            <input type="text" id="studio-text-input" placeholder="Ex: Golaço na Arena! ⚽🔥" maxlength="60">
+                        </div>
+
+                        <div class="text-styles-row">
+                            <button class="style-pill active" data-style="black-pill">🏷️ Tarja Preta</button>
+                            <button class="style-pill" data-style="gold-pill">🏆 Ouro / Neon</button>
+                            <button class="style-pill" data-style="cyan-pill">💎 Ciano Esporte</button>
+                            <button class="style-pill" data-style="clean-text">✨ Texto Limpo</button>
+                        </div>
+
+                        <div class="text-pos-row">
+                            <span>Posição vertical:</span>
+                            <div class="text-pos-buttons">
+                                <button class="pos-btn" data-pos="top">Topo</button>
+                                <button class="pos-btn active" data-pos="middle">Meio</button>
+                                <button class="pos-btn" data-pos="bottom">Rodapé</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Barra de Ações Finais (Salvar & Instagram) -->
+                <div class="studio-actions-footer">
+                    <button class="btn-studio-action btn-studio-save" id="btn-studio-save">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Salvar Vídeo</span>
+                    </button>
+                    <button class="btn-studio-action btn-studio-share-insta" id="btn-studio-share-insta">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                        </svg>
+                        <span>Postar no Instagram</span>
+                    </button>
+                </div>
+
+                <!-- Overlay de Renderização e Progresso -->
+                <div class="studio-render-overlay" id="studio-render-overlay" style="display: none;">
+                    <div class="render-card">
+                        <div class="loading-spinner"></div>
+                        <h4 id="render-status-title">Renderizando seu Lance...</h4>
+                        <p id="render-status-sub">Aplicando corte 9:16, zoom e legenda</p>
+                        <div class="render-progress-bar">
+                            <div class="render-progress-fill" id="render-progress-fill" style="width: 15%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast Flutuante -->
         <div class="floating-toast" id="toast"></div>
 

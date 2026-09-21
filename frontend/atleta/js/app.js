@@ -347,6 +347,21 @@ function renderReelsFeed() {
                         <span class="rail-btn-label">Velocidade</span>
                     </button>
 
+                    <!-- Editar Lance (Trim, Crop 9:16, Texto, Instagram) -->
+                    <button class="action-rail-btn btn-edit-clip" 
+                            onclick="openVideoStudio('${clip.filename}', event)">
+                        <div class="rail-btn-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                <circle cx="6" cy="6" r="3"></circle>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+                                <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+                                <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+                            </svg>
+                        </div>
+                        <span class="rail-btn-label">Editar</span>
+                    </button>
+
                     <!-- WhatsApp -->
                     <button class="action-rail-btn btn-whatsapp" 
                             onclick="shareClipDirect('${clip.filename}', event)">
@@ -877,6 +892,662 @@ function setupEventListeners() {
             }
         }
     });
+
+    // Inicializa controles do Estúdio de Edição do Atleta
+    setupStudioEventListeners();
+}
+
+// ==========================================================================
+// MOTOR DO ESTÚDIO DE EDIÇÃO DO ATLETA (Corte, Crop 9:16, Texto & Instagram)
+// ==========================================================================
+
+let studioClip = null;
+let studioDuration = 10;
+let studioTrimStart = 0;
+let studioTrimEnd = 10;
+let studioAspectRatio = '9-16'; // '9-16', '1-1', '16-9'
+let studioPanPct = 50; // 0 a 100%
+let studioText = '';
+let studioTextStyle = 'black-pill';
+let studioTextPos = 'middle'; // 'top', 'middle', 'bottom'
+let studioIsRendering = false;
+
+// Elementos do Estúdio
+const studioModalBackdrop = document.getElementById('studio-modal-backdrop');
+const btnCloseStudio = document.getElementById('btn-close-studio');
+const btnStudioReset = document.getElementById('btn-studio-reset');
+const studioClipTag = document.getElementById('studio-clip-tag');
+const studioCropContainer = document.getElementById('studio-crop-container');
+const studioPreviewVideo = document.getElementById('studio-preview-video');
+const studioTextOverlay = document.getElementById('studio-text-overlay');
+const studioTextContent = document.getElementById('studio-text-content');
+
+const trimStartRange = document.getElementById('trim-start-range');
+const trimEndRange = document.getElementById('trim-end-range');
+const trimStartLabel = document.getElementById('trim-start-label');
+const trimDurLabel = document.getElementById('trim-dur-label');
+const trimEndLabel = document.getElementById('trim-end-label');
+
+const ratioButtons = document.querySelectorAll('.ratio-btn');
+const panXRange = document.getElementById('pan-x-range');
+const panPctLabel = document.getElementById('pan-pct-label');
+const panSliderWrap = document.getElementById('pan-slider-wrap');
+
+const studioTextInput = document.getElementById('studio-text-input');
+const stylePills = document.querySelectorAll('.style-pill');
+const posButtons = document.querySelectorAll('.pos-btn');
+
+const btnStudioSave = document.getElementById('btn-studio-save');
+const btnStudioShareInsta = document.getElementById('btn-studio-share-insta');
+
+const studioTabButtons = document.querySelectorAll('.studio-tab-btn');
+const studioPanels = document.querySelectorAll('.studio-panel');
+
+const studioRenderOverlay = document.getElementById('studio-render-overlay');
+const renderStatusTitle = document.getElementById('render-status-title');
+const renderStatusSub = document.getElementById('render-status-sub');
+const renderProgressFill = document.getElementById('render-progress-fill');
+
+function setupStudioEventListeners() {
+    if (!studioModalBackdrop) return;
+
+    // Fechar Modal
+    btnCloseStudio.addEventListener('click', closeVideoStudio);
+    btnStudioReset.addEventListener('click', resetStudioDefaults);
+
+    // Abas de Ferramentas
+    studioTabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabName = btn.getAttribute('data-tab');
+            studioTabButtons.forEach(b => b.classList.remove('active'));
+            studioPanels.forEach(p => p.classList.remove('active'));
+
+            btn.classList.add('active');
+            const targetPanel = document.getElementById(`panel-${tabName}`);
+            if (targetPanel) targetPanel.classList.add('active');
+        });
+    });
+
+    // Sliders de Corte (Trim)
+    trimStartRange.addEventListener('input', (e) => {
+        let val = parseFloat(e.target.value);
+        if (val >= studioTrimEnd - 0.5) {
+            val = studioTrimEnd - 0.5;
+            e.target.value = val;
+        }
+        studioTrimStart = val;
+        trimStartLabel.textContent = `${studioTrimStart.toFixed(1)}s`;
+        trimDurLabel.textContent = `${(studioTrimEnd - studioTrimStart).toFixed(1)}s`;
+        studioPreviewVideo.currentTime = studioTrimStart;
+    });
+
+    trimEndRange.addEventListener('input', (e) => {
+        let val = parseFloat(e.target.value);
+        if (val <= studioTrimStart + 0.5) {
+            val = studioTrimStart + 0.5;
+            e.target.value = val;
+        }
+        studioTrimEnd = val;
+        trimEndLabel.textContent = `${studioTrimEnd.toFixed(1)}s`;
+        trimDurLabel.textContent = `${(studioTrimEnd - studioTrimStart).toFixed(1)}s`;
+    });
+
+    // Loop do Vídeo do Estúdio dentro do trecho cortado
+    studioPreviewVideo.addEventListener('timeupdate', () => {
+        if (studioPreviewVideo.currentTime >= studioTrimEnd || studioPreviewVideo.currentTime < studioTrimStart - 0.1) {
+            studioPreviewVideo.currentTime = studioTrimStart;
+        }
+    });
+
+    // Seleção de Formato (Crop / Aspect Ratio)
+    ratioButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            ratioButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const ratio = btn.getAttribute('data-ratio');
+            studioAspectRatio = ratio;
+            studioCropContainer.className = `studio-crop-container ratio-${ratio}`;
+
+            if (ratio === '16-9') {
+                panSliderWrap.style.display = 'none';
+            } else {
+                panSliderWrap.style.display = 'flex';
+            }
+            updateStudioTransform();
+        });
+    });
+
+    // Slider de Pan Horizontal (Enquadramento)
+    panXRange.addEventListener('input', (e) => {
+        studioPanPct = parseInt(e.target.value);
+        let labelText = 'Centro (50%)';
+        if (studioPanPct < 40) labelText = `Foco Esquerda (${studioPanPct}%)`;
+        else if (studioPanPct > 60) labelText = `Foco Direita (${studioPanPct}%)`;
+        panPctLabel.textContent = labelText;
+        updateStudioTransform();
+    });
+
+    // Entrada de Texto e Estilo
+    studioTextInput.addEventListener('input', (e) => {
+        studioText = e.target.value.trim();
+        updateStudioTextOverlay();
+    });
+
+    stylePills.forEach(btn => {
+        btn.addEventListener('click', () => {
+            stylePills.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            studioTextStyle = btn.getAttribute('data-style');
+            updateStudioTextOverlay();
+        });
+    });
+
+    posButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            posButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            studioTextPos = btn.getAttribute('data-pos');
+            updateStudioTextOverlay();
+        });
+    });
+
+    // Drag & Drop no Texto Overlay via Touch/Mouse
+    setupTextDragListeners();
+
+    // Ações de Salvar e Compartilhar
+    btnStudioSave.addEventListener('click', handleStudioSave);
+    btnStudioShareInsta.addEventListener('click', handleStudioShareInstagram);
+}
+
+function updateStudioTransform() {
+    if (studioAspectRatio === '16-9') {
+        studioPreviewVideo.style.objectPosition = 'center center';
+        studioPreviewVideo.style.transform = 'scale(1)';
+    } else {
+        // Ajusta a posição horizontal da imagem no enquadramento
+        studioPreviewVideo.style.objectPosition = `${studioPanPct}% center`;
+    }
+}
+
+function updateStudioTextOverlay() {
+    if (!studioText) {
+        studioTextOverlay.style.display = 'none';
+        return;
+    }
+
+    studioTextOverlay.style.display = 'block';
+    studioTextContent.textContent = studioText;
+    studioTextOverlay.className = `studio-text-overlay ${studioTextStyle}`;
+
+    if (studioTextPos === 'top') {
+        studioTextOverlay.style.top = '20%';
+    } else if (studioTextPos === 'bottom') {
+        studioTextOverlay.style.top = '78%';
+    } else {
+        studioTextOverlay.style.top = '48%';
+    }
+}
+
+function setupTextDragListeners() {
+    let isDragging = false;
+    let startY = 0;
+    let initialTopPct = 48;
+
+    const onStart = (clientY) => {
+        isDragging = true;
+        startY = clientY;
+        const parentRect = studioCropContainer.getBoundingClientRect();
+        const elemRect = studioTextOverlay.getBoundingClientRect();
+        initialTopPct = ((elemRect.top + elemRect.height / 2 - parentRect.top) / parentRect.height) * 100;
+    };
+
+    const onMove = (clientY) => {
+        if (!isDragging) return;
+        const parentRect = studioCropContainer.getBoundingClientRect();
+        const deltaY = clientY - startY;
+        const deltaPct = (deltaY / parentRect.height) * 100;
+        let newTop = Math.max(12, Math.min(88, initialTopPct + deltaPct));
+        studioTextOverlay.style.top = `${newTop}%`;
+    };
+
+    const onEnd = () => {
+        isDragging = false;
+    };
+
+    studioTextOverlay.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) onStart(e.touches[0].clientY);
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+        if (isDragging && e.touches.length > 0) onMove(e.touches[0].clientY);
+    }, { passive: true });
+
+    window.addEventListener('touchend', onEnd);
+
+    studioTextOverlay.addEventListener('mousedown', (e) => {
+        onStart(e.clientY);
+        e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (isDragging) onMove(e.clientY);
+    });
+
+    window.addEventListener('mouseup', onEnd);
+}
+
+// Abrir o Estúdio para um clipe específico
+function openVideoStudio(filename, event) {
+    if (event) event.stopPropagation();
+
+    // Pausa qualquer reprodução ativa no feed
+    if (currentActiveVideo) currentActiveVideo.pause();
+
+    studioClip = allClips.find(c => c.filename === filename);
+    if (!studioClip) {
+        showToast("Lance não encontrado.");
+        return;
+    }
+
+    studioClipTag.textContent = studioClip.camera_name || extractCameraLabel(studioClip.filename);
+    const videoSrc = studioClip.video_url || studioClip.preview_url;
+
+    studioPreviewVideo.src = videoSrc;
+    studioPreviewVideo.load();
+
+    studioPreviewVideo.onloadedmetadata = () => {
+        studioDuration = studioPreviewVideo.duration || 10;
+        studioTrimStart = 0;
+        studioTrimEnd = studioDuration;
+
+        trimStartRange.max = studioDuration;
+        trimStartRange.value = 0;
+        trimEndRange.max = studioDuration;
+        trimEndRange.value = studioDuration;
+
+        trimStartLabel.textContent = "0.0s";
+        trimEndLabel.textContent = `${studioDuration.toFixed(1)}s`;
+        trimDurLabel.textContent = `${studioDuration.toFixed(1)}s`;
+
+        studioPreviewVideo.currentTime = 0;
+        studioPreviewVideo.play().catch(() => {});
+    };
+
+    resetStudioDefaults();
+    studioModalBackdrop.style.display = 'flex';
+}
+
+function closeVideoStudio() {
+    studioPreviewVideo.pause();
+    studioModalBackdrop.style.display = 'none';
+
+    // Retoma a reprodução do reel ativo
+    if (currentActiveVideo) {
+        currentActiveVideo.play().catch(() => {});
+    }
+}
+
+function resetStudioDefaults() {
+    studioAspectRatio = '9-16';
+    studioPanPct = 50;
+    studioText = '';
+    studioTextStyle = 'black-pill';
+    studioTextPos = 'middle';
+
+    ratioButtons.forEach(b => b.classList.toggle('active', b.getAttribute('data-ratio') === '9-16'));
+    studioCropContainer.className = 'studio-crop-container ratio-9-16';
+    panSliderWrap.style.display = 'flex';
+
+    panXRange.value = 50;
+    panPctLabel.textContent = 'Centro (50%)';
+
+    studioTextInput.value = '';
+    stylePills.forEach(b => b.classList.toggle('active', b.getAttribute('data-style') === 'black-pill'));
+    posButtons.forEach(b => b.classList.toggle('active', b.getAttribute('data-pos') === 'middle'));
+
+    if (studioPreviewVideo.duration) {
+        studioTrimStart = 0;
+        studioTrimEnd = studioPreviewVideo.duration;
+        trimStartRange.value = 0;
+        trimEndRange.value = studioDuration;
+        trimStartLabel.textContent = "0.0s";
+        trimEndLabel.textContent = `${studioDuration.toFixed(1)}s`;
+        trimDurLabel.textContent = `${studioDuration.toFixed(1)}s`;
+    }
+
+    updateStudioTransform();
+    updateStudioTextOverlay();
+}
+
+// ==========================================================================
+// RENDERIZAÇÃO DUAL (Backend FFmpeg com Fallback em Canvas WebCodecs)
+// ==========================================================================
+
+async function renderEditedVideoBlob(progressCallback) {
+    if (!studioClip) throw new Error("Nenhum lance selecionado");
+
+    progressCallback(10, "Iniciando corte e enquadramento...");
+
+    // 1. Tentar renderizar via API do Backend local (qualidade ultra-HD com FFmpeg nativo)
+    try {
+        const payload = {
+            filename: studioClip.filename,
+            start_time: studioTrimStart,
+            end_time: studioTrimEnd,
+            aspect_ratio: studioAspectRatio,
+            pan_pct: studioPanPct,
+            text: studioText,
+            text_style: studioTextStyle,
+            text_pos: studioTextPos
+        };
+
+        progressCallback(35, "Processando vídeo com aceleração de hardware...");
+
+        const response = await fetch(`${API_BASE}/api/clips/edit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            progressCallback(85, "Finalizando arquivo MP4...");
+            const blob = await response.blob();
+            progressCallback(100, "Concluído!");
+            return new Blob([blob], { type: 'video/mp4' });
+        }
+    } catch (err) {
+        console.warn("Backend local indisponível, utilizando motor Canvas do navegador:", err);
+    }
+
+    // 2. Fallback de alta performance no cliente (Canvas 2D + MediaRecorder)
+    return await renderWithBrowserCanvas(progressCallback);
+}
+
+async function renderWithBrowserCanvas(progressCallback) {
+    return new Promise((resolve, reject) => {
+        try {
+            progressCallback(20, "Preparando renderizador do navegador...");
+
+            // Dimensões do Canvas baseadas no Formato Escolhido
+            let targetW = 720;
+            let targetH = 1280; // 9:16 vertical Reels
+            if (studioAspectRatio === '1-1') {
+                targetW = 720;
+                targetH = 720;
+            } else if (studioAspectRatio === '16-9') {
+                targetW = 1280;
+                targetH = 720;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+            const ctx = canvas.getContext('2d');
+
+            const video = document.createElement('video');
+            video.src = studioClip.video_url || studioClip.preview_url;
+            video.crossOrigin = 'anonymous';
+            video.muted = true;
+            video.playsInline = true;
+
+            video.onloadeddata = async () => {
+                try {
+                    video.currentTime = studioTrimStart;
+                    await new Promise(r => video.onseeked = r);
+
+                    progressCallback(40, "Renderizando frames e legendas...");
+
+                    const stream = canvas.captureStream(30);
+                    let options = { mimeType: 'video/webm; codecs=vp9' };
+                    if (MediaRecorder.isTypeSupported('video/mp4; codecs="avc1.42E01E"')) {
+                        options = { mimeType: 'video/mp4; codecs="avc1.42E01E"' };
+                    } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+                        options = { mimeType: 'video/mp4' };
+                    }
+
+                    const mediaRecorder = new MediaRecorder(stream, options);
+                    const chunks = [];
+
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data && e.data.size > 0) chunks.push(e.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: options.mimeType || 'video/mp4' });
+                        progressCallback(100, "Vídeo renderizado com sucesso!");
+                        resolve(blob);
+                    };
+
+                    mediaRecorder.start(100);
+                    video.play();
+
+                    const dur = studioTrimEnd - studioTrimStart;
+
+                    const drawFrame = () => {
+                        if (video.currentTime >= studioTrimEnd || video.paused || video.ended) {
+                            video.pause();
+                            mediaRecorder.stop();
+                            return;
+                        }
+
+                        const currentProgress = Math.min(95, 40 + ((video.currentTime - studioTrimStart) / dur) * 55);
+                        progressCallback(currentProgress, `Renderizando: ${(video.currentTime - studioTrimStart).toFixed(1)}s / ${dur.toFixed(1)}s`);
+
+                        // 1. Calcula o recorte (Crop & Pan)
+                        const vw = video.videoWidth || 1280;
+                        const vh = video.videoHeight || 720;
+
+                        let cropW = vw;
+                        let cropH = vh;
+                        let cropX = 0;
+                        let cropY = 0;
+
+                        if (studioAspectRatio === '9-16') {
+                            cropW = vh * (9 / 16);
+                            cropX = (vw - cropW) * (studioPanPct / 100.0);
+                        } else if (studioAspectRatio === '1-1') {
+                            cropW = vh;
+                            cropX = (vw - cropW) * (studioPanPct / 100.0);
+                        }
+
+                        // Limpa o canvas
+                        ctx.fillStyle = "#000000";
+                        ctx.fillRect(0, 0, targetW, targetH);
+
+                        // Desenha o frame de vídeo recortado
+                        ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
+
+                        // 2. Desenha Marca D'água
+                        ctx.save();
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+                        ctx.roundRect(targetW - 130, 20, 110, 30, 6);
+                        ctx.fill();
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = "bold 13px 'Plus Jakarta Sans', sans-serif";
+                        ctx.fillText("⚡ MOMENTOS", targetW - 120, 40);
+                        ctx.restore();
+
+                        // 3. Desenha Texto / Legenda se configurado
+                        if (studioText) {
+                            drawTextOnCanvas(ctx, targetW, targetH);
+                        }
+
+                        requestAnimationFrame(drawFrame);
+                    };
+
+                    requestAnimationFrame(drawFrame);
+                } catch (e) {
+                    reject(e);
+                }
+            };
+
+            video.onerror = (err) => reject(err);
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+function drawTextOnCanvas(ctx, w, h) {
+    ctx.save();
+    let textY = h * 0.48;
+    if (studioTextPos === 'top') textY = h * 0.20;
+    else if (studioTextPos === 'bottom') textY = h * 0.80;
+
+    const fontSize = Math.round(w * 0.05);
+    ctx.font = `900 ${fontSize}px 'Plus Jakarta Sans', sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const textMetrics = ctx.measureText(studioText);
+    const boxPaddingX = 24;
+    const boxPaddingY = 14;
+    const boxW = textMetrics.width + (boxPaddingX * 2);
+    const boxH = fontSize + (boxPaddingY * 2);
+    const boxX = (w - boxW) / 2;
+    const boxY = textY - (boxH / 2);
+
+    if (studioTextStyle === 'black-pill') {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(studioText, w / 2, textY);
+    } else if (studioTextStyle === 'gold-pill') {
+        const grad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
+        grad.addColorStop(0, "#fbbf24");
+        grad.addColorStop(1, "#d97706");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+        ctx.fill();
+
+        ctx.fillStyle = "#000000";
+        ctx.fillText(studioText, w / 2, textY);
+    } else if (studioTextStyle === 'cyan-pill') {
+        const grad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
+        grad.addColorStop(0, "#06b6d4");
+        grad.addColorStop(1, "#2563eb");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(studioText, w / 2, textY);
+    } else {
+        // Texto Limpo com Sombra Intensa
+        ctx.shadowColor = "rgba(0, 0, 0, 0.95)";
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 3;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(studioText, w / 2, textY);
+    }
+    ctx.restore();
+}
+
+// Salvar Vídeo Editado
+async function handleStudioSave() {
+    if (studioIsRendering) return;
+    studioIsRendering = true;
+
+    studioRenderOverlay.style.display = 'flex';
+    renderStatusTitle.textContent = "Preparando seu Vídeo...";
+    renderProgressFill.style.width = '10%';
+
+    try {
+        const blob = await renderEditedVideoBlob((pct, status) => {
+            renderProgressFill.style.width = `${pct}%`;
+            renderStatusSub.textContent = status;
+        });
+
+        // Dispara o download automático do arquivo
+        const filename = `lance_momentos_${Date.now()}.mp4`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+        showToast("Vídeo salvo com sucesso na sua galeria! 💾✨");
+        setTimeout(() => {
+            studioRenderOverlay.style.display = 'none';
+            studioIsRendering = false;
+        }, 800);
+    } catch (err) {
+        console.error("Erro ao renderizar vídeo:", err);
+        showToast("Erro ao processar o vídeo.", true);
+        studioRenderOverlay.style.display = 'none';
+        studioIsRendering = false;
+    }
+}
+
+// Compartilhar no Instagram via Web Share API
+async function handleStudioShareInstagram() {
+    if (studioIsRendering) return;
+    studioIsRendering = true;
+
+    studioRenderOverlay.style.display = 'flex';
+    renderStatusTitle.textContent = "Preparando para o Instagram...";
+    renderProgressFill.style.width = '10%';
+
+    try {
+        const blob = await renderEditedVideoBlob((pct, status) => {
+            renderProgressFill.style.width = `${pct}%`;
+            renderStatusSub.textContent = status;
+        });
+
+        const filename = `lance_momentos_${Date.now()}.mp4`;
+        const file = new File([blob], filename, { type: 'video/mp4' });
+
+        // Tenta acionar a Web Share API Nativa (abre Instagram / WhatsApp / TikTok)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            studioRenderOverlay.style.display = 'none';
+            studioIsRendering = false;
+
+            await navigator.share({
+                files: [file],
+                title: 'Meu Lance no Momentos',
+                text: studioText || 'Confira esse lance gravado pelo Sistema Momentos! ⚽🔥'
+            });
+            showToast("Compartilhado com sucesso!");
+        } else {
+            // Em navegadores sem suporte a compartilhamento de arquivo direto (desktop):
+            // Baixa o arquivo e abre o Instagram para o usuário postar
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            showToast("Vídeo baixado! Abrindo Instagram para postagem... 📸");
+            setTimeout(() => {
+                window.open('https://www.instagram.com/', '_blank');
+                studioRenderOverlay.style.display = 'none';
+                studioIsRendering = false;
+            }, 1200);
+        }
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.error("Erro ao compartilhar no Instagram:", err);
+            showToast("Erro ao compartilhar vídeo.", true);
+        }
+        studioRenderOverlay.style.display = 'none';
+        studioIsRendering = false;
+    }
 }
 
 // --- Utilitários ---
@@ -905,3 +1576,4 @@ function showToast(msg) {
         toastElement.classList.remove('show');
     }, 2800);
 }
+

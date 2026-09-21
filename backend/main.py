@@ -98,6 +98,16 @@ class ControlBinding(BaseModel):
     gamepad_index: Optional[int] = None
     button_index: Optional[int] = None
 
+class EditClipRequest(BaseModel):
+    filename: str
+    start_time: float = 0.0
+    end_time: float = 10.0
+    aspect_ratio: str = "9-16" # "9-16", "1-1", "16-9"
+    pan_pct: float = 50.0 # 0 a 100
+    text: Optional[str] = None
+    text_style: Optional[str] = "black-pill"
+    text_pos: Optional[str] = "middle"
+
 def fix_incompatible_clips():
     """
     Verifica se existem vídeos salvos em formatos antigos (ex: FMP4/mp4v)
@@ -372,6 +382,68 @@ async def delete_clip(clip_filename: str):
         "deleted_local": local_deleted,
         "deleted_cloud": cloud_deleted
     }
+
+# Editar clipe (Corte, Crop 9:16/1:1, Pan e Otimização para Instagram)
+@app.post("/api/clips/edit")
+async def edit_clip(req: EditClipRequest):
+    import subprocess
+    input_path = os.path.join(CLIPS_DIR, req.filename)
+
+    # Se o arquivo não existir localmente, tenta baixar do Cloudflare R2
+    if not os.path.exists(input_path):
+        from cloud_sync import R2_PUBLIC_URL
+        import urllib.request
+        r2_url = f"{R2_PUBLIC_URL}/{req.filename}"
+        try:
+            os.makedirs(CLIPS_DIR, exist_ok=True)
+            urllib.request.urlretrieve(r2_url, input_path)
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"Clipe não encontrado: {str(e)}")
+
+    output_filename = f"editado_{req.filename}"
+    output_path = os.path.join(CLIPS_DIR, output_filename)
+
+    start_sec = max(0.0, req.start_time)
+    duration = max(0.5, req.end_time - start_sec)
+    pan_ratio = max(0.0, min(1.0, req.pan_pct / 100.0))
+
+    # Constrói filtros de vídeo FFmpeg para crop e escala
+    vf_filters = []
+    if req.aspect_ratio == "9-16":
+        vf_filters.append(f"crop=w=ih*9/16:h=ih:x=(iw-ow)*{pan_ratio}:y=0,scale=720:1280:flags=lanczos")
+    elif req.aspect_ratio == "1-1":
+        vf_filters.append(f"crop=w=ih:h=ih:x=(iw-ow)*{pan_ratio}:y=0,scale=720:720:flags=lanczos")
+    else:
+        vf_filters.append("scale=1280:720:flags=lanczos")
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", str(start_sec),
+        "-t", str(duration),
+        "-i", input_path,
+        "-vf", ",".join(vf_filters),
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "22",
+        "-c:a", "aac",
+        "-movflags", "+faststart",
+        output_path
+    ]
+
+    try:
+        res = await asyncio.to_thread(subprocess.run, cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if res.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            return FileResponse(
+                output_path,
+                media_type="video/mp4",
+                filename=f"lance_{req.filename}",
+                headers={"Content-Disposition": f'attachment; filename="lance_{req.filename}"'}
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Falha ao processar vídeo com FFmpeg")
+    except Exception as e:
+        logger.error(f"Erro ao editar clipe: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Controles / Mapeamento de Botões Arcade ---
 @app.get("/api/config/controls")
