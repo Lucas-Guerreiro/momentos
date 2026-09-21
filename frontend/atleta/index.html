@@ -136,7 +136,20 @@
                 <div class="studio-preview-viewport">
                     <div class="studio-crop-container ratio-9-16" id="studio-crop-container">
                         <div class="studio-video-wrapper" id="studio-video-wrapper">
-                            <video id="studio-preview-video" playsinline webkit-playsinline loop muted></video>
+                            <!-- Poster de Fallback para visualização instantânea sem tela preta -->
+                            <img id="studio-poster-fallback" class="studio-poster-img" alt="Poster do Lance" src="">
+                            <video id="studio-preview-video" playsinline webkit-playsinline loop muted preload="auto"></video>
+                        </div>
+
+                        <!-- Botão Central de Play/Pause com Toque no Vídeo -->
+                        <div class="studio-play-indicator" id="studio-play-indicator">
+                            <svg class="icon-studio-play" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="6 3 20 12 6 21 6 3"></polygon>
+                            </svg>
+                            <svg class="icon-studio-pause" style="display: none;" viewBox="0 0 24 24" fill="currentColor">
+                                <rect x="6" y="4" width="4" height="16"></rect>
+                                <rect x="14" y="4" width="4" height="16"></rect>
+                            </svg>
                         </div>
                         
                         <!-- Texto Overlay Arrastável no Vídeo -->
@@ -183,6 +196,16 @@
                     <!-- PAINEL 1: CORTE DE TEMPO (TRIM) -->
                     <div class="studio-panel active" id="panel-trim">
                         <div class="trim-time-row">
+                            <button class="btn-studio-play-toggle" id="btn-studio-play-toggle" title="Play / Pausar">
+                                <svg class="ico-btn-play" viewBox="0 0 24 24" fill="currentColor">
+                                    <polygon points="6 3 20 12 6 21 6 3"></polygon>
+                                </svg>
+                                <svg class="ico-btn-pause" style="display: none;" viewBox="0 0 24 24" fill="currentColor">
+                                    <rect x="6" y="4" width="4" height="16"></rect>
+                                    <rect x="14" y="4" width="4" height="16"></rect>
+                                </svg>
+                                <span id="label-trim-play">Play</span>
+                            </button>
                             <div class="time-badge">Início: <strong id="trim-start-label">0.0s</strong></div>
                             <div class="time-badge highlight">Duração: <strong id="trim-dur-label">0.0s</strong></div>
                             <div class="time-badge">Fim: <strong id="trim-end-label">0.0s</strong></div>
