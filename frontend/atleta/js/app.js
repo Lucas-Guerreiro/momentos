@@ -1216,8 +1216,13 @@ function setupTextDragListeners() {
 function openVideoStudio(filename, event) {
     if (event) event.stopPropagation();
 
-    // Pausa qualquer reprodução ativa no feed
-    if (currentActiveVideo) currentActiveVideo.pause();
+    // 1. Pausa qualquer reprodução ativa no feed para liberar a GPU mobile
+    if (currentActiveVideo) {
+        try { currentActiveVideo.pause(); } catch(e) {}
+    }
+    document.querySelectorAll('.reel-video').forEach(v => {
+        try { v.pause(); } catch(e) {}
+    });
 
     studioClip = allClips.find(c => c.filename === filename);
     if (!studioClip) {
@@ -1245,37 +1250,39 @@ function openVideoStudio(filename, event) {
 
     resetStudioDefaults();
 
+    // Configura o vídeo sem crossorigin para permitir streaming do R2 sem bloqueio de segurança
+    studioPreviewVideo.removeAttribute('crossorigin');
     studioPreviewVideo.poster = studioClip.thumb_url;
     studioPreviewVideo.muted = true;
+    studioPreviewVideo.defaultMuted = true;
     studioPreviewVideo.playsInline = true;
     studioPreviewVideo.setAttribute('playsinline', '');
     studioPreviewVideo.setAttribute('webkit-playsinline', '');
-    studioPreviewVideo.crossOrigin = 'anonymous';
+    studioPreviewVideo.setAttribute('muted', '');
     studioPreviewVideo.src = videoSrc;
 
     const setupMetadata = () => {
-        studioDuration = studioPreviewVideo.duration || 10;
-        studioTrimStart = 0;
-        studioTrimEnd = studioDuration;
+        if (studioPreviewVideo.duration && !isNaN(studioPreviewVideo.duration) && studioPreviewVideo.duration > 0) {
+            studioDuration = studioPreviewVideo.duration;
+            studioTrimEnd = studioDuration;
 
-        trimStartRange.min = 0;
-        trimStartRange.max = studioDuration;
-        trimStartRange.step = 0.1;
-        trimStartRange.value = 0;
+            trimStartRange.min = 0;
+            trimStartRange.max = studioDuration;
+            trimStartRange.step = 0.1;
+            trimStartRange.value = 0;
 
-        trimEndRange.min = 0;
-        trimEndRange.max = studioDuration;
-        trimEndRange.step = 0.1;
-        trimEndRange.value = studioDuration;
+            trimEndRange.min = 0;
+            trimEndRange.max = studioDuration;
+            trimEndRange.step = 0.1;
+            trimEndRange.value = studioDuration;
 
-        trimStartLabel.textContent = "0.0s";
-        trimEndLabel.textContent = `${studioDuration.toFixed(1)}s`;
-        trimDurLabel.textContent = `${studioDuration.toFixed(1)}s`;
+            trimStartLabel.textContent = "0.0s";
+            trimEndLabel.textContent = `${studioDuration.toFixed(1)}s`;
+            trimDurLabel.textContent = `${studioDuration.toFixed(1)}s`;
+        }
 
-        studioPreviewVideo.currentTime = 0;
-        const playProm = studioPreviewVideo.play();
-        if (playProm !== undefined) {
-            playProm.then(() => {
+        if (studioPreviewVideo.paused) {
+            studioPreviewVideo.play().then(() => {
                 updateStudioPlayState(true);
             }).catch(err => {
                 console.log("Autoplay preview notice:", err);
@@ -1288,6 +1295,13 @@ function openVideoStudio(filename, event) {
     if (studioPreviewVideo.readyState >= 1) {
         setupMetadata();
     }
+
+    studioPreviewVideo.oncanplay = () => {
+        if (studioPosterFallback) {
+            studioPosterFallback.style.opacity = '0';
+            studioPosterFallback.style.display = 'none';
+        }
+    };
 
     studioPreviewVideo.onloadeddata = () => {
         if (studioPosterFallback) {
@@ -1307,10 +1321,23 @@ function openVideoStudio(filename, event) {
 
     studioModalBackdrop.style.display = 'flex';
     studioPreviewVideo.load();
+
+    // Dispara o play imediatamente aproveitando a ação de clique do usuário
+    const directPlay = studioPreviewVideo.play();
+    if (directPlay !== undefined) {
+        directPlay.then(() => {
+            updateStudioPlayState(true);
+        }).catch(err => {
+            console.log("Aguardando carregamento de buffer para reprodução:", err);
+        });
+    }
 }
 
 function closeVideoStudio() {
-    studioPreviewVideo.pause();
+    if (studioPreviewVideo) {
+        studioPreviewVideo.pause();
+        studioPreviewVideo.src = '';
+    }
     studioModalBackdrop.style.display = 'none';
 
     // Retoma a reprodução do reel ativo
