@@ -1231,7 +1231,14 @@ function openVideoStudio(filename, event) {
     }
 
     studioClipTag.textContent = studioClip.camera_name || extractCameraLabel(studioClip.filename);
-    const videoSrc = studioClip.preview_url || studioClip.video_url || `${API_BASE}/api/clips/${studioClip.filename}`;
+
+    // Seleciona a rota mais rápida e compatível com streaming Range
+    const localVideoUrl = `${API_BASE}/api/clips/${studioClip.filename}`;
+    const cloudVideoUrl = studioClip.video_url || `${R2_PUBLIC_URL}/${studioClip.filename}`;
+    const isLocalNetwork = window.location.origin.includes('localhost') || 
+                           window.location.origin.includes('127.0.0.1') || 
+                           window.location.origin.includes('192.168.');
+    const videoSrc = isLocalNetwork ? localVideoUrl : (cloudVideoUrl || localVideoUrl);
 
     // Mostra o poster imediatamente para garantir que a imagem apareça sem tela preta
     if (studioPosterFallback) {
@@ -1259,7 +1266,15 @@ function openVideoStudio(filename, event) {
     studioPreviewVideo.setAttribute('playsinline', '');
     studioPreviewVideo.setAttribute('webkit-playsinline', '');
     studioPreviewVideo.setAttribute('muted', '');
+    studioPreviewVideo.setAttribute('loop', '');
     studioPreviewVideo.src = videoSrc;
+
+    const hidePoster = () => {
+        if (studioPosterFallback) {
+            studioPosterFallback.style.opacity = '0';
+            studioPosterFallback.style.display = 'none';
+        }
+    };
 
     const setupMetadata = () => {
         if (studioPreviewVideo.duration && !isNaN(studioPreviewVideo.duration) && studioPreviewVideo.duration > 0) {
@@ -1284,6 +1299,7 @@ function openVideoStudio(filename, event) {
         if (studioPreviewVideo.paused) {
             studioPreviewVideo.play().then(() => {
                 updateStudioPlayState(true);
+                hidePoster();
             }).catch(err => {
                 console.log("Autoplay preview notice:", err);
                 updateStudioPlayState(false);
@@ -1296,21 +1312,14 @@ function openVideoStudio(filename, event) {
         setupMetadata();
     }
 
-    studioPreviewVideo.oncanplay = () => {
-        if (studioPosterFallback) {
-            studioPosterFallback.style.opacity = '0';
-            studioPosterFallback.style.display = 'none';
-        }
-    };
-
-    studioPreviewVideo.onloadeddata = () => {
-        if (studioPosterFallback) {
-            studioPosterFallback.style.opacity = '0';
-            studioPosterFallback.style.display = 'none';
-        }
-    };
+    studioPreviewVideo.onplaying = hidePoster;
+    studioPreviewVideo.oncanplay = hidePoster;
+    studioPreviewVideo.onloadeddata = hidePoster;
 
     studioPreviewVideo.onerror = () => {
+        const err = studioPreviewVideo.error;
+        if (err && err.code === 1) return; // Ignore aborted requests
+        
         console.warn("Aviso ao carregar vídeo no editor, tentando fallback local:", studioClip.filename);
         if (!studioPreviewVideo.src.includes('/api/clips/')) {
             studioPreviewVideo.src = `${API_BASE}/api/clips/${studioClip.filename}`;
@@ -1327,8 +1336,9 @@ function openVideoStudio(filename, event) {
     if (directPlay !== undefined) {
         directPlay.then(() => {
             updateStudioPlayState(true);
+            hidePoster();
         }).catch(err => {
-            console.log("Aguardando carregamento de buffer para reprodução:", err);
+            console.log("Aguardando buffer para reprodução imediata:", err);
         });
     }
 }
