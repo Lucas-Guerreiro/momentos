@@ -953,6 +953,18 @@ const renderStatusTitle = document.getElementById('render-status-title');
 const renderStatusSub = document.getElementById('render-status-sub');
 const renderProgressFill = document.getElementById('render-progress-fill');
 
+// Elementos do Modal de Exportação / Vídeo Pronto
+const studioExportModal = document.getElementById('studio-export-modal');
+const btnCloseExport = document.getElementById('btn-close-export');
+const exportPreviewVideo = document.getElementById('export-preview-video');
+const btnExportSave = document.getElementById('btn-export-save');
+const btnExportWa = document.getElementById('btn-export-wa');
+const btnExportInsta = document.getElementById('btn-export-insta');
+
+let currentExportBlob = null;
+let currentExportFile = null;
+let currentExportUrl = null;
+
 function toggleStudioPlayPause() {
     if (!studioPreviewVideo) return;
     if (studioPreviewVideo.paused) {
@@ -1128,6 +1140,19 @@ function setupStudioEventListeners() {
     if (btnStudioSave) btnStudioSave.addEventListener('click', handleStudioSave);
     if (btnStudioShareWa) btnStudioShareWa.addEventListener('click', handleStudioShareWhatsApp);
     if (btnStudioShareInsta) btnStudioShareInsta.addEventListener('click', handleStudioShareInstagram);
+
+    // Ações do Modal de Vídeo Pronto
+    if (btnCloseExport) btnCloseExport.addEventListener('click', closeExportModal);
+    if (btnExportSave) btnExportSave.addEventListener('click', handleExportModalSave);
+    if (btnExportWa) btnExportWa.addEventListener('click', handleExportModalWhatsApp);
+    if (btnExportInsta) btnExportInsta.addEventListener('click', handleExportModalInstagram);
+    if (studioExportModal) {
+        studioExportModal.addEventListener('click', (e) => {
+            if (e.target === studioExportModal) {
+                closeExportModal();
+            }
+        });
+    }
 }
 
 function updateStudioTransform() {
@@ -1617,14 +1642,38 @@ function drawTextOnCanvas(ctx, w, h) {
     ctx.restore();
 }
 
-// Salvar Vídeo Editado
+// ==========================================================================
+// AÇÕES DE EXPORTAÇÃO E COMPARTILHAMENTO
+// ==========================================================================
+
 async function handleStudioSave() {
+    await runStudioExport('save');
+}
+
+async function handleStudioShareWhatsApp() {
+    await runStudioExport('whatsapp');
+}
+
+async function handleStudioShareInstagram() {
+    await runStudioExport('instagram');
+}
+
+async function runStudioExport(actionType) {
     if (studioIsRendering) return;
     studioIsRendering = true;
 
     studioRenderOverlay.style.display = 'flex';
-    renderStatusTitle.textContent = "Preparando seu Vídeo...";
+    
+    if (actionType === 'whatsapp') {
+        renderStatusTitle.textContent = "Preparando para o WhatsApp...";
+    } else if (actionType === 'instagram') {
+        renderStatusTitle.textContent = "Preparando para o Instagram...";
+    } else {
+        renderStatusTitle.textContent = "Preparando seu Vídeo...";
+    }
+    
     renderProgressFill.style.width = '15%';
+    renderStatusSub.textContent = "Iniciando corte e badges...";
 
     try {
         const blob = await renderEditedVideoBlob((pct, status) => {
@@ -1633,173 +1682,147 @@ async function handleStudioSave() {
         });
 
         const filename = `lance_momentos_${Date.now()}.mp4`;
-        const file = new File([blob], filename, { type: 'video/mp4' });
-        const url = URL.createObjectURL(blob);
-
-        // 1. Tenta compartilhamento nativo no mobile (permite salvar direto na galeria/Fotos)
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
-            studioRenderOverlay.style.display = 'none';
-            studioIsRendering = false;
-            try {
-                await navigator.share({
-                    files: [file],
-                    title: 'Salvar Vídeo',
-                    text: 'Meu lance gravado no Momentos ⚽🔥'
-                });
-                showToast("Vídeo pronto! 💾✨");
-                return;
-            } catch (err) {
-                if (err.name === 'AbortError') return;
-            }
+        currentExportBlob = blob;
+        currentExportFile = new File([blob], filename, { type: 'video/mp4' });
+        
+        if (currentExportUrl) {
+            URL.revokeObjectURL(currentExportUrl);
         }
+        currentExportUrl = URL.createObjectURL(blob);
 
-        // 2. Download direto via elemento âncora
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }, 3000);
+        // 1. Download automático em background
+        downloadExportFile();
 
-        showToast("Vídeo salvo com sucesso! 💾✨");
-        setTimeout(() => {
-            studioRenderOverlay.style.display = 'none';
-            studioIsRendering = false;
-        }, 800);
+        // 2. Finaliza overlay de renderização
+        studioRenderOverlay.style.display = 'none';
+        studioIsRendering = false;
+
+        // 3. Abre o modal de compartilhamento instantâneo
+        showExportSuccessModal(actionType);
+
     } catch (err) {
-        console.error("Erro ao salvar vídeo:", err);
-        showToast("Erro ao processar o vídeo.", true);
+        console.error("Erro ao processar o vídeo:", err);
+        showToast("Erro ao processar o vídeo. Tente novamente.", true);
         studioRenderOverlay.style.display = 'none';
         studioIsRendering = false;
     }
 }
 
-// Compartilhar no WhatsApp
-async function handleStudioShareWhatsApp() {
-    if (studioIsRendering) return;
-    studioIsRendering = true;
+function showExportSuccessModal(actionType) {
+    if (!studioExportModal) return;
 
-    studioRenderOverlay.style.display = 'flex';
-    renderStatusTitle.textContent = "Preparando para o WhatsApp...";
-    renderProgressFill.style.width = '15%';
+    if (exportPreviewVideo && currentExportUrl) {
+        exportPreviewVideo.src = currentExportUrl;
+        exportPreviewVideo.play().catch(e => console.log("Preview autoplay:", e));
+    }
 
-    try {
-        const blob = await renderEditedVideoBlob((pct, status) => {
-            renderProgressFill.style.width = `${pct}%`;
-            renderStatusSub.textContent = status;
-        });
+    studioExportModal.style.display = 'flex';
 
-        const filename = `lance_momentos_${Date.now()}.mp4`;
-        const file = new File([blob], filename, { type: 'video/mp4' });
-        const shareMsg = studioText ? `${studioText} ⚽🔥 (Gravado no Sistema Momentos)` : 'Confira meu lance gravado no Sistema Momentos! ⚽🔥';
+    if (actionType === 'whatsapp') {
+        showToast("Vídeo pronto! Toque em 'Enviar no WhatsApp' abaixo 💬");
+    } else if (actionType === 'instagram') {
+        showToast("Vídeo em 9:16 pronto! Toque em 'Postar no Instagram' abaixo 📸");
+    } else {
+        showToast("Vídeo salvo e pronto para compartilhar! 🎉💾");
+    }
+}
 
-        // 1. Tenta compartilhamento nativo de arquivo (envia o vídeo MP4 diretamente no WhatsApp)
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            studioRenderOverlay.style.display = 'none';
-            studioIsRendering = false;
+function closeExportModal() {
+    if (studioExportModal) {
+        studioExportModal.style.display = 'none';
+    }
+    if (exportPreviewVideo) {
+        exportPreviewVideo.pause();
+        exportPreviewVideo.src = '';
+    }
+}
 
+function downloadExportFile() {
+    if (!currentExportUrl) return;
+    const filename = (currentExportFile && currentExportFile.name) ? currentExportFile.name : `lance_momentos_${Date.now()}.mp4`;
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = currentExportUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        if (document.body.contains(a)) document.body.removeChild(a);
+    }, 1500);
+}
+
+async function handleExportModalSave() {
+    if (!currentExportFile) return;
+
+    // Se o dispositivo suporta Web Share com arquivos (iOS Fotos / Android Galeria)
+    if (navigator.canShare && navigator.canShare({ files: [currentExportFile] })) {
+        try {
             await navigator.share({
-                files: [file],
+                files: [currentExportFile],
+                title: 'Salvar Vídeo',
+                text: studioText ? `${studioText} ⚽🔥 (Momentos)` : 'Meu lance gravado no Sistema Momentos! ⚽🔥'
+            });
+            showToast("Vídeo salvo na Galeria! 💾✨");
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.warn("Share API cancelada/falhou, baixando arquivo:", err);
+        }
+    }
+
+    downloadExportFile();
+    showToast("Download do vídeo iniciado! 💾");
+}
+
+async function handleExportModalWhatsApp() {
+    if (!currentExportFile) return;
+    const shareMsg = studioText ? `${studioText} ⚽🔥 (Gravado no Sistema Momentos)` : 'Confira meu lance gravado no Sistema Momentos! ⚽🔥';
+
+    if (navigator.canShare && navigator.canShare({ files: [currentExportFile] })) {
+        try {
+            await navigator.share({
+                files: [currentExportFile],
                 title: 'Lance - Momentos',
                 text: shareMsg
             });
-            showToast("Compartilhado com sucesso!");
-        } else {
-            // 2. Fallback no desktop: baixa o vídeo e abre o WhatsApp Web
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 3000);
-
-            showToast("Vídeo baixado! Abrindo WhatsApp... 💬");
-            const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
-            setTimeout(() => {
-                window.open(waUrl, '_blank');
-                studioRenderOverlay.style.display = 'none';
-                studioIsRendering = false;
-            }, 1000);
+            showToast("Compartilhado no WhatsApp! 💬✨");
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.warn("Share API falhou para WhatsApp:", err);
         }
-    } catch (err) {
-        if (err.name !== 'AbortError') {
-            console.error("Erro ao compartilhar no WhatsApp:", err);
-            showToast("Erro ao compartilhar vídeo.", true);
-        }
-        studioRenderOverlay.style.display = 'none';
-        studioIsRendering = false;
     }
+
+    // Fallback Desktop: abre o link do WhatsApp
+    downloadExportFile();
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
+    window.open(waUrl, '_blank');
+    showToast("Abrindo WhatsApp... O vídeo foi salvo nos seus Downloads! 💬");
 }
 
-// Compartilhar no Instagram
-async function handleStudioShareInstagram() {
-    if (studioIsRendering) return;
-    studioIsRendering = true;
+async function handleExportModalInstagram() {
+    if (!currentExportFile) return;
+    const shareMsg = studioText ? `${studioText} ⚽🔥 #momentos #futebol` : 'Confira esse lance gravado pelo Sistema Momentos! ⚽🔥 #momentos';
 
-    studioRenderOverlay.style.display = 'flex';
-    renderStatusTitle.textContent = "Preparando para o Instagram...";
-    renderProgressFill.style.width = '15%';
-
-    try {
-        const blob = await renderEditedVideoBlob((pct, status) => {
-            renderProgressFill.style.width = `${pct}%`;
-            renderStatusSub.textContent = status;
-        });
-
-        const filename = `lance_momentos_${Date.now()}.mp4`;
-        const file = new File([blob], filename, { type: 'video/mp4' });
-        const shareMsg = studioText ? `${studioText} ⚽🔥 #momentos #futebol` : 'Confira esse lance gravado pelo Sistema Momentos! ⚽🔥 #momentos';
-
-        // 1. Tenta compartilhamento nativo de arquivo (abre Stories / Reels / Feed no Instagram)
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            studioRenderOverlay.style.display = 'none';
-            studioIsRendering = false;
-
+    if (navigator.canShare && navigator.canShare({ files: [currentExportFile] })) {
+        try {
             await navigator.share({
-                files: [file],
+                files: [currentExportFile],
                 title: 'Meu Lance no Momentos',
                 text: shareMsg
             });
-            showToast("Compartilhado com sucesso!");
-        } else {
-            // 2. Fallback no desktop: baixa o vídeo em 9:16 e abre o Instagram Web
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 3000);
-
-            showToast("Vídeo baixado! Abrindo Instagram para postagem... 📸");
-            setTimeout(() => {
-                window.open('https://www.instagram.com/', '_blank');
-                studioRenderOverlay.style.display = 'none';
-                studioIsRendering = false;
-            }, 1000);
+            showToast("Compartilhado no Instagram! 📸✨");
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.warn("Share API falhou para Instagram:", err);
         }
-    } catch (err) {
-        if (err.name !== 'AbortError') {
-            console.error("Erro ao compartilhar no Instagram:", err);
-            showToast("Erro ao compartilhar vídeo.", true);
-        }
-        studioRenderOverlay.style.display = 'none';
-        studioIsRendering = false;
     }
+
+    // Fallback Desktop: abre o Instagram Web
+    downloadExportFile();
+    window.open('https://www.instagram.com/', '_blank');
+    showToast("Abrindo Instagram... O vídeo em 9:16 foi salvo nos seus Downloads! 📸");
 }
 
 // --- Utilitários ---
