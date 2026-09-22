@@ -808,39 +808,33 @@ function toggleViewMode(forcedMode) {
     }
 }
 
-// --- Compartilhamento Direto / WhatsApp ---
+// --- Compartilhamento Direto / WhatsApp no Feed ---
 async function shareClipDirect(filename, e) {
     if (e) e.stopPropagation();
 
     const targetClip = allClips.find(c => c.filename === filename);
     const videoUrl = targetClip?.video_url || `${API_BASE}/api/clips/${filename}`;
     const shareTitle = `Lance - Momentos`;
-    const shareText = `Confira esse lance gravado no Momentos:`;
+    const shareMsg = `Confira esse lance gravado pelo Sistema Momentos! ⚽🔥\n${videoUrl}`;
 
     if (navigator.share) {
         try {
             await navigator.share({
                 title: shareTitle,
-                text: shareText,
+                text: 'Confira esse lance gravado pelo Sistema Momentos! ⚽🔥',
                 url: videoUrl
             });
             showToast("Lance compartilhado!");
+            return;
         } catch (err) {
-            if (err.name !== 'AbortError') {
-                copyToClipboard(videoUrl);
-            }
+            if (err.name === 'AbortError') return;
         }
-    } else {
-        copyToClipboard(videoUrl);
     }
-}
 
-function copyToClipboard(url) {
-    navigator.clipboard.writeText(url).then(() => {
-        showToast("Link do lance copiado! Cole no WhatsApp 📋");
-    }).catch(() => {
-        prompt("Copie o link do lance:", url);
-    });
+    // Fallback direto: abre o WhatsApp com a mensagem e o link do vídeo
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
+    window.open(waUrl, '_blank');
+    showToast("Abrindo WhatsApp... 💬");
 }
 
 // --- Configuração de Eventos Globais ---
@@ -948,6 +942,7 @@ const stylePills = document.querySelectorAll('.style-pill');
 const posButtons = document.querySelectorAll('.pos-btn');
 
 const btnStudioSave = document.getElementById('btn-studio-save');
+const btnStudioShareWa = document.getElementById('btn-studio-share-wa');
 const btnStudioShareInsta = document.getElementById('btn-studio-share-insta');
 
 const studioTabButtons = document.querySelectorAll('.studio-tab-btn');
@@ -1130,8 +1125,9 @@ function setupStudioEventListeners() {
     setupTextDragListeners();
 
     // Ações de Salvar e Compartilhar
-    btnStudioSave.addEventListener('click', handleStudioSave);
-    btnStudioShareInsta.addEventListener('click', handleStudioShareInstagram);
+    if (btnStudioSave) btnStudioSave.addEventListener('click', handleStudioSave);
+    if (btnStudioShareWa) btnStudioShareWa.addEventListener('click', handleStudioShareWhatsApp);
+    if (btnStudioShareInsta) btnStudioShareInsta.addEventListener('click', handleStudioShareInstagram);
 }
 
 function updateStudioTransform() {
@@ -1628,47 +1624,7 @@ async function handleStudioSave() {
 
     studioRenderOverlay.style.display = 'flex';
     renderStatusTitle.textContent = "Preparando seu Vídeo...";
-    renderProgressFill.style.width = '10%';
-
-    try {
-        const blob = await renderEditedVideoBlob((pct, status) => {
-            renderProgressFill.style.width = `${pct}%`;
-            renderStatusSub.textContent = status;
-        });
-
-        // Dispara o download automático do arquivo
-        const filename = `lance_momentos_${Date.now()}.mp4`;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        setTimeout(() => URL.revokeObjectURL(url), 4000);
-
-        showToast("Vídeo salvo com sucesso na sua galeria! 💾✨");
-        setTimeout(() => {
-            studioRenderOverlay.style.display = 'none';
-            studioIsRendering = false;
-        }, 800);
-    } catch (err) {
-        console.error("Erro ao renderizar vídeo:", err);
-        showToast("Erro ao processar o vídeo.", true);
-        studioRenderOverlay.style.display = 'none';
-        studioIsRendering = false;
-    }
-}
-
-// Compartilhar no Instagram via Web Share API
-async function handleStudioShareInstagram() {
-    if (studioIsRendering) return;
-    studioIsRendering = true;
-
-    studioRenderOverlay.style.display = 'flex';
-    renderStatusTitle.textContent = "Preparando para o Instagram...";
-    renderProgressFill.style.width = '10%';
+    renderProgressFill.style.width = '15%';
 
     try {
         const blob = await renderEditedVideoBlob((pct, status) => {
@@ -1678,8 +1634,133 @@ async function handleStudioShareInstagram() {
 
         const filename = `lance_momentos_${Date.now()}.mp4`;
         const file = new File([blob], filename, { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
 
-        // Tenta acionar a Web Share API Nativa (abre Instagram / WhatsApp / TikTok)
+        // 1. Tenta compartilhamento nativo no mobile (permite salvar direto na galeria/Fotos)
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+            studioRenderOverlay.style.display = 'none';
+            studioIsRendering = false;
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: 'Salvar Vídeo',
+                    text: 'Meu lance gravado no Momentos ⚽🔥'
+                });
+                showToast("Vídeo pronto! 💾✨");
+                return;
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+            }
+        }
+
+        // 2. Download direto via elemento âncora
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 3000);
+
+        showToast("Vídeo salvo com sucesso! 💾✨");
+        setTimeout(() => {
+            studioRenderOverlay.style.display = 'none';
+            studioIsRendering = false;
+        }, 800);
+    } catch (err) {
+        console.error("Erro ao salvar vídeo:", err);
+        showToast("Erro ao processar o vídeo.", true);
+        studioRenderOverlay.style.display = 'none';
+        studioIsRendering = false;
+    }
+}
+
+// Compartilhar no WhatsApp
+async function handleStudioShareWhatsApp() {
+    if (studioIsRendering) return;
+    studioIsRendering = true;
+
+    studioRenderOverlay.style.display = 'flex';
+    renderStatusTitle.textContent = "Preparando para o WhatsApp...";
+    renderProgressFill.style.width = '15%';
+
+    try {
+        const blob = await renderEditedVideoBlob((pct, status) => {
+            renderProgressFill.style.width = `${pct}%`;
+            renderStatusSub.textContent = status;
+        });
+
+        const filename = `lance_momentos_${Date.now()}.mp4`;
+        const file = new File([blob], filename, { type: 'video/mp4' });
+        const shareMsg = studioText ? `${studioText} ⚽🔥 (Gravado no Sistema Momentos)` : 'Confira meu lance gravado no Sistema Momentos! ⚽🔥';
+
+        // 1. Tenta compartilhamento nativo de arquivo (envia o vídeo MP4 diretamente no WhatsApp)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            studioRenderOverlay.style.display = 'none';
+            studioIsRendering = false;
+
+            await navigator.share({
+                files: [file],
+                title: 'Lance - Momentos',
+                text: shareMsg
+            });
+            showToast("Compartilhado com sucesso!");
+        } else {
+            // 2. Fallback no desktop: baixa o vídeo e abre o WhatsApp Web
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 3000);
+
+            showToast("Vídeo baixado! Abrindo WhatsApp... 💬");
+            const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
+            setTimeout(() => {
+                window.open(waUrl, '_blank');
+                studioRenderOverlay.style.display = 'none';
+                studioIsRendering = false;
+            }, 1000);
+        }
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.error("Erro ao compartilhar no WhatsApp:", err);
+            showToast("Erro ao compartilhar vídeo.", true);
+        }
+        studioRenderOverlay.style.display = 'none';
+        studioIsRendering = false;
+    }
+}
+
+// Compartilhar no Instagram
+async function handleStudioShareInstagram() {
+    if (studioIsRendering) return;
+    studioIsRendering = true;
+
+    studioRenderOverlay.style.display = 'flex';
+    renderStatusTitle.textContent = "Preparando para o Instagram...";
+    renderProgressFill.style.width = '15%';
+
+    try {
+        const blob = await renderEditedVideoBlob((pct, status) => {
+            renderProgressFill.style.width = `${pct}%`;
+            renderStatusSub.textContent = status;
+        });
+
+        const filename = `lance_momentos_${Date.now()}.mp4`;
+        const file = new File([blob], filename, { type: 'video/mp4' });
+        const shareMsg = studioText ? `${studioText} ⚽🔥 #momentos #futebol` : 'Confira esse lance gravado pelo Sistema Momentos! ⚽🔥 #momentos';
+
+        // 1. Tenta compartilhamento nativo de arquivo (abre Stories / Reels / Feed no Instagram)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             studioRenderOverlay.style.display = 'none';
             studioIsRendering = false;
@@ -1687,26 +1768,29 @@ async function handleStudioShareInstagram() {
             await navigator.share({
                 files: [file],
                 title: 'Meu Lance no Momentos',
-                text: studioText || 'Confira esse lance gravado pelo Sistema Momentos! ⚽🔥'
+                text: shareMsg
             });
             showToast("Compartilhado com sucesso!");
         } else {
-            // Em navegadores sem suporte a compartilhamento de arquivo direto (desktop):
-            // Baixa o arquivo e abre o Instagram para o usuário postar
+            // 2. Fallback no desktop: baixa o vídeo em 9:16 e abre o Instagram Web
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
+            a.style.display = 'none';
             a.href = url;
             a.download = filename;
             document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 3000);
 
             showToast("Vídeo baixado! Abrindo Instagram para postagem... 📸");
             setTimeout(() => {
                 window.open('https://www.instagram.com/', '_blank');
                 studioRenderOverlay.style.display = 'none';
                 studioIsRendering = false;
-            }, 1200);
+            }, 1000);
         }
     } catch (err) {
         if (err.name !== 'AbortError') {

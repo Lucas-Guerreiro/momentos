@@ -488,7 +488,7 @@ async def edit_clip(req: EditClipRequest):
         r2_url = f"{R2_PUBLIC_URL}/{req.filename}"
         try:
             os.makedirs(CLIPS_DIR, exist_ok=True)
-            urllib.request.urlretrieve(r2_url, input_path)
+            await asyncio.to_thread(urllib.request.urlretrieve, r2_url, input_path)
         except Exception as e:
             raise HTTPException(status_code=404, detail=f"Clipe não encontrado: {str(e)}")
 

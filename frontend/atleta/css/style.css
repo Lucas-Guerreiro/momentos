@@ -1419,6 +1419,17 @@ html, body {
     background: #3f3f46;
 }
 
+.btn-studio-share-wa {
+    background: #25d366;
+    color: #ffffff;
+    box-shadow: 0 4px 18px rgba(37, 211, 102, 0.35);
+}
+
+.btn-studio-share-wa:active {
+    transform: scale(0.97);
+    background: #20ba5a;
+}
+
 .btn-studio-share-insta {
     background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
     color: #ffffff;
